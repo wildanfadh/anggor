@@ -1,0 +1,5 @@
+{
+  "name": "tester",
+  "description": "Generate tests for coverage, edge cases, and regression",
+  "tools": ["read_file", "run_command"]
+}

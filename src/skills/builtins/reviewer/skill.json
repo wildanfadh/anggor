@@ -1,0 +1,5 @@
+{
+  "name": "reviewer",
+  "description": "Review code for bugs, maintainability, performance, and security",
+  "tools": ["git_diff", "read_file"]
+}

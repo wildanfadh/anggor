@@ -1,0 +1,5 @@
+{
+  "name": "refactor",
+  "description": "Refactor code to reduce complexity and duplication",
+  "tools": ["read_file", "write_file", "apply_patch"]
+}

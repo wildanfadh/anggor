@@ -1,0 +1,5 @@
+{
+  "name": "security",
+  "description": "Audit code for security vulnerabilities",
+  "tools": ["read_file", "search_code"]
+}
