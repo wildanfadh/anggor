@@ -1,0 +1,5 @@
+task: 3
+name: Implement OpenAI provider (chat + streaming via Vercel AI SDK)
+agent: fullstack-engineer
+status: done
+date: 2026-06-11

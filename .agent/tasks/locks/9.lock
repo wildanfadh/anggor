@@ -1,0 +1,5 @@
+task: 9
+name: Implement file tools (read, write, apply patch, create, delete)
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

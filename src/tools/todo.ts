@@ -1,16 +1,16 @@
 /**
  * Todo Tracking Tools
  *
- * Track progress within an agent session.
+ * V1.0 todo tracking that works with session memory.
+ * Used by the agent internally and displayed via `anggor status`.
  */
 
-export interface TodoItem {
-  id: string;
-  task: string;
-  status: "pending" | "in-progress" | "done" | "failed";
-}
+import type { SessionMemory } from "../agent/memory.js";
+import { TodoTracker } from "./todo-tracker.js";
+
+export { TodoTracker } from "./todo-tracker.js";
+export type { TodoSummary } from "./todo-tracker.js";
 
 export const todoTools = {
-  // TODO: Implement todo tracking
-  // create_todo, update_todo, list_todos
+  createTracker: (memory: SessionMemory) => new TodoTracker(memory),
 } as const;

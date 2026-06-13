@@ -1,0 +1,5 @@
+task: 18
+name: Implement interrupt handling (`SIGINT`)
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

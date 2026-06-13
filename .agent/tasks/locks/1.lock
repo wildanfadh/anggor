@@ -1,0 +1,5 @@
+task: 1
+name: Implement CLI argument parser (command, flags, one-shot mode)
+agent: fullstack-engineer
+status: done
+date: 2026-06-11

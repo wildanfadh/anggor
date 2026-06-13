@@ -1,0 +1,5 @@
+task: 14
+name: Implement todo tracking + `anggor status`
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

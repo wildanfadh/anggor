@@ -4,43 +4,64 @@
 - `[ ]` Not started
 - `[~]` In progress
 - `[x]` Done
-- `[-]` Blocked
+- `[-]` Blocked / Deferred
 
-## Tasks
+## V1.0 Tasks
 
-| # | Task | Priority | Agent | Status | 
+| # | Task | Priority | Agent | Status |
 |---|------|----------|-------|--------|
-| 1 | Implement CLI argument parser (command, flags, one-shot mode) | P0 | fullstack-engineer | [ ] |
-| 2 | Implement config loader (anggor.config.json + ~/.anggor/config.json + env vars) | P0 | fullstack-engineer | [ ] |
-| 3 | Implement OpenAI provider (chat + streaming via Vercel AI SDK) | P0 | fullstack-engineer | [ ] |
-| 4 | Implement Anthropic provider (chat + streaming via Vercel AI SDK) | P0 | fullstack-engineer | [ ] |
-| 5 | Implement Google/Gemini provider (chat + streaming) | P1 | fullstack-engineer | [ ] |
-| 6 | Implement Ollama provider (chat + streaming) | P1 | fullstack-engineer | [ ] |
-| 7 | Implement Custom/OpenAI-compatible provider | P1 | fullstack-engineer | [ ] |
-| 8 | Implement file tools (read, write, patch, create, delete) | P0 | fullstack-engineer | [ ] |
-| 9 | Implement terminal/shell command tool | P0 | fullstack-engineer | [ ] |
-| 10 | Implement git tools (status, diff, log, branch, commit) | P0 | fullstack-engineer | [ ] |
-| 11 | Implement search tools (code search, file find) | P1 | fullstack-engineer | [ ] |
-| 12 | Implement todo tracking tool | P1 | fullstack-engineer | [ ] |
-| 13 | Implement agent core loop (plan → execute → validate → iterate) | P0 | fullstack-engineer | [ ] |
-| 14 | Implement planner module (plan generation, step tracking) | P0 | fullstack-engineer | [ ] |
-| 15 | Implement session memory (save/restore/summarize) | P1 | fullstack-engineer | [ ] |
-| 16 | Implement approval system (safe/balanced/dangerous modes) | P0 | fullstack-engineer | [ ] |
-| 17 | Implement project scanner (detect framework, language, tools) | P1 | fullstack-engineer | [ ] |
-| 18 | Implement MCP client (JSON-RPC connection, tool discovery) | P1 | fullstack-engineer | [ ] |
-| 19 | Implement MCP discovery & registry | P2 | fullstack-engineer | [ ] |
-| 20 | Implement skill loader (built-in + user-installed) | P1 | fullstack-engineer | [ ] |
-| 21 | Implement terminal UI (chat mode, spinners, colors, output) | P0 | fullstack-engineer | [ ] |
-| 22 | Setup Vitest test infrastructure | P0 | test-engineer | [ ] |
-| 23 | Unit tests for config loader (Zod validation) | P1 | test-engineer | [ ] |
-| 24 | Unit tests for provider interface | P1 | test-engineer | [ ] |
-| 25 | Unit tests for file tools | P1 | test-engineer | [ ] |
-| 26 | Integration test: agent loop with mock provider | P1 | test-engineer | [ ] |
-| 27 | Verify startup time < 10ms | P1 | qa-qc-engineer | [ ] |
-| 28 | Verify single binary build works (tsup compile) | P1 | qa-qc-engineer | [ ] |
+| 1 | Implement CLI argument parser (command, flags, one-shot mode) | P0 | fullstack-engineer | [x] |
+| 2 | Refactor config system to final `.anggor.json` schema | P0 | fullstack-engineer | [x] |
+| 3 | Implement OpenAI provider (chat + streaming via Vercel AI SDK) | P0 | fullstack-engineer | [x] |
+| 4 | Implement Anthropic provider (chat + streaming via Vercel AI SDK) | P0 | fullstack-engineer | [x] |
+| 5 | Implement custom/OpenAI-compatible provider | P1 | fullstack-engineer | [ ] |
+| 6 | Implement Ollama provider | P1 | fullstack-engineer | [ ] |
+| 7 | Implement grep/ripgrep wrapper for context search | P0 | fullstack-engineer | [x] |
+| 8 | Implement project scanner with `.gitignore` / `.ignore` support | P0 | fullstack-engineer | [x] |
+| 9 | Implement file tools (read, write, apply patch, create, delete) | P0 | fullstack-engineer | [x] |
+| 10 | Implement shell executor with safety rules | P0 | fullstack-engineer | [x] |
+| 11 | Implement git workflow tools | P0 | fullstack-engineer | [x] |
+| 12 | Implement session memory (in-session only) | P1 | fullstack-engineer | [x] |
+| 13 | Implement planner module | P0 | fullstack-engineer | [x] |
+| 14 | Implement todo tracking + `anggor status` | P0 | fullstack-engineer | [x] |
+| 15 | Implement agent core ReAct loop | P0 | fullstack-engineer | [x] |
+| 16 | Implement streaming output for model + tools | P0 | fullstack-engineer | [x] |
+| 17 | Implement dry-run mode (`--dry-run`) | P0 | fullstack-engineer | [x] |
+| 18 | Implement interrupt handling (`SIGINT`) | P0 | fullstack-engineer | [x] |
+| 19 | Wire provider selection from config (single provider per session) | P0 | fullstack-engineer | [x] |
+| 20 | Add Google/Gemini provider | P1 | fullstack-engineer | [ ] |
+| 21 | Add OpenRouter / Groq / DeepSeek provider support | P2 | fullstack-engineer | [ ] |
+| 22 | Update README and examples to match V1.0 blueprint | P1 | fullstack-engineer | [x] |
+| 23 | Setup Vitest test infrastructure | P0 | test-engineer | [ ] |
+| 24 | Add unit tests for config loader | P0 | test-engineer | [ ] |
+| 25 | Add unit tests for providers | P1 | test-engineer | [ ] |
+| 26 | Add unit tests for file and shell tools | P1 | test-engineer | [ ] |
+| 27 | Add integration test for agent loop with mock provider | P1 | test-engineer | [ ] |
+| 28 | Verify startup target `<50ms` for `anggor --help` | P1 | qa-qc-engineer | [ ] |
+| 29 | Verify startup target `<200ms` for one-shot boot | P1 | qa-qc-engineer | [ ] |
+| 30 | Verify single-binary build flow | P1 | qa-qc-engineer | [ ] |
+
+## V1.1 Deferred Tasks
+
+| # | Task | Priority | Agent | Status |
+|---|------|----------|-------|--------|
+| 31 | Add persistent memory bank | P2 | fullstack-engineer | [-] |
+| 32 | Add MCP client and discovery | P2 | fullstack-engineer | [-] |
+| 33 | Add rollback and checkpoint support | P2 | fullstack-engineer | [-] |
+
+## V2.0 Deferred Tasks
+
+| # | Task | Priority | Agent | Status |
+|---|------|----------|-------|--------|
+| 34 | Add semantic search | P3 | fullstack-engineer | [-] |
+| 35 | Add skill marketplace | P3 | fullstack-engineer | [-] |
+| 36 | Add multi-provider routing | P3 | fullstack-engineer | [-] |
+| 37 | Add cost tracking | P3 | fullstack-engineer | [-] |
+| 38 | Add telemetry (opt-in) | P3 | fullstack-engineer | [-] |
+| 39 | Add plugin system | P3 | fullstack-engineer | [-] |
 
 ## Guidelines
-- One task per row, be specific
-- Lock tasks before starting (`tasks/locks/<task-number>.lock`)
-- Update status when starting/completing
-- Link to relevant files or commits in notes
+- Prioritize V1.0 until core workflow is usable end-to-end.
+- Lock tasks before starting (`tasks/locks/<task-number>.lock`).
+- Defer V1.1/V2.0 work unless it directly supports V1.0 implementation.
+- Keep commit messages, PR titles, and code comments in English.

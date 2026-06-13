@@ -1,0 +1,5 @@
+task: 10
+name: Implement shell executor with safety rules
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

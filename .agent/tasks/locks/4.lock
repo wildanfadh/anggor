@@ -1,0 +1,5 @@
+task: 4
+name: Implement Anthropic provider (chat + streaming via Vercel AI SDK)
+agent: fullstack-engineer
+status: done
+date: 2026-06-11

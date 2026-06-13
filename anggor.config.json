@@ -1,7 +1,28 @@
 {
-  "provider": "openai",
-  "model": "gpt-4o",
-  "approvalMode": "balanced",
-  "providers": {},
+  "provider": {
+    "name": "openai",
+    "model": "gpt-4-turbo-preview",
+    "apiKey": "env:OPENAI_API_KEY"
+  },
+  "agent": {
+    "maxIterations": 15,
+    "temperature": 0.7,
+    "approvalMode": "balanced"
+  },
+  "context": {
+    "maxTokens": 8000,
+    "ignorePatterns": ["node_modules", "dist", ".git", "*.log"],
+    "scanDepth": 3
+  },
+  "safety": {
+    "blockedCommands": ["rm -rf", "sudo", "drop database", "mkfs"],
+    "allowedCommands": ["npm", "yarn", "bun", "go", "python", "node", "git"]
+  },
+  "theme": {
+    "primary": "cyan",
+    "secondary": "dim",
+    "error": "red",
+    "success": "green"
+  },
   "mcpServers": {}
 }

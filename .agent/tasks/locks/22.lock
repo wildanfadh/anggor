@@ -1,0 +1,5 @@
+task: 22
+name: Update README and examples to match V1.0 blueprint
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

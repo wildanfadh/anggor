@@ -1,10 +1,15 @@
 /**
  * Search Tools
  *
- * Semantic search, code search, and file finding.
+ * grep/ripgrep-based local context search for V1.0.
  */
 
+import { searchInFiles, type SearchOptions, type SearchResult } from "../context/grep.js";
+
+async function searchCode(query: string, options: SearchOptions = {}): Promise<SearchResult> {
+  return searchInFiles(query, options);
+}
+
 export const searchTools = {
-  // TODO: Implement search tools
-  // search_code, find_files, semantic_search
+  searchCode,
 } as const;
