@@ -1,6 +1,8 @@
 import type { ParsedCommand } from "./types.js";
 import type { RuntimeContext } from "../runtime.js";
 import { Agent } from "../agent/core.js";
+import { SessionMemory } from "../agent/memory.js";
+import { loadMemory as loadPersistent, applyLoadedState } from "../memory/bank.js";
 import { printPlanHeader, printCompletion } from "../ui/stream.js";
 import { printInfo, printMuted, printWarning } from "../ui/output.js";
 import { createInterruptHandler, registerSimpleInterrupt } from "../utils/interrupt.js";
@@ -87,17 +89,73 @@ export async function routeCommand(
       return;
     }
 
-    case "resume":
+    case "resume": {
       registerSimpleInterrupt();
-      printInfo("Resuming previous session...");
-      printMuted("Resume mode not implemented yet.");
-      return;
+      const saved = await loadPersistent();
 
-    case "mcp":
-      registerSimpleInterrupt();
-      printInfo(`MCP command: ${command.subcommand ?? "list"}`);
-      printMuted("MCP not implemented yet.");
+      if (!saved) {
+        printWarning("No previous session found.");
+        return;
+      }
+
+      printInfo(`Resuming session from ${new Date(saved.updatedAt).toLocaleString()}`);
+      printMuted(`Previous CWD: ${saved.cwd}`);
+      printMuted(`Messages: ${saved.messages.length} | Tool calls: ${saved.toolCalls.length} | Todos: ${saved.todos.length}`);
+
+      if (saved.summary) {
+        printMuted(`Summary: ${saved.summary}`);
+      }
+
+      const memory = new SessionMemory();
+      applyLoadedState(memory, saved);
+
+      const agent = new Agent({ config: context.config });
+      // Restore memory into agent
+      for (const msg of saved.messages) {
+        agent.memory.addMessage(msg.role, msg.content);
+      }
+      for (const todo of saved.todos) {
+        agent.todos.addTodo(todo.task);
+      }
+
+      printInfo(`Session restored. Use "${saved.messages.length > 0 ? saved.messages[saved.messages.length - 1]?.content.slice(0, 50) : "anggor"}" as context.`);
       return;
+    }
+
+    case "mcp": {
+      registerSimpleInterrupt();
+      const subcommand = command.subcommand ?? "list";
+
+      if (subcommand === "list") {
+        const mcpServers = context.config.mcpServers;
+        const names = Object.keys(mcpServers);
+
+        if (names.length === 0) {
+          printMuted("No MCP servers configured.");
+          return;
+        }
+
+        printInfo(`MCP servers (${names.length}):`);
+        for (const name of names) {
+          const raw = mcpServers[name] as Record<string, unknown> | undefined;
+          printMuted(`  ${name} → ${raw?.command ?? "unknown"}`);
+        }
+        return;
+      }
+
+      if (subcommand === "add") {
+        printMuted("MCP add command not implemented yet. Add servers to anggor.config.json.");
+        return;
+      }
+
+      if (subcommand === "remove") {
+        printMuted("MCP remove command not implemented yet. Remove servers from anggor.config.json.");
+        return;
+      }
+
+      printMuted(`Unknown MCP subcommand: ${subcommand}`);
+      return;
+    }
 
     case "skill":
       registerSimpleInterrupt();

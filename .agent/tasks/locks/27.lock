@@ -1,0 +1,5 @@
+task: 27
+name: Add integration test for agent loop with mock provider
+agent: test-engineer
+status: done
+date: 2026-06-12

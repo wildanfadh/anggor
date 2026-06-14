@@ -1,0 +1,5 @@
+task: 23
+name: Setup Vitest test infrastructure
+agent: test-engineer
+status: done
+date: 2026-06-12

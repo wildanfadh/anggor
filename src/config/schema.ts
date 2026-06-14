@@ -72,6 +72,14 @@ export const ConfigSchema = z.object({
   context: ContextConfigSchema.default({}),
   safety: SafetyConfigSchema.default({}),
   theme: ThemeConfigSchema.default({}),
+  routing: z.object({
+    planner: ProviderNameSchema.optional(),
+    coder: ProviderNameSchema.optional(),
+    reviewer: ProviderNameSchema.optional(),
+  }).optional(),
+  telemetry: z.object({
+    enabled: z.boolean().default(false),
+  }).default({}),
   mcpServers: z.record(z.unknown()).default({}),
 });
 

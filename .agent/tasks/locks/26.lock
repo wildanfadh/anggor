@@ -1,0 +1,5 @@
+task: 26
+name: Add unit tests for file and shell tools
+agent: test-engineer
+status: done
+date: 2026-06-12

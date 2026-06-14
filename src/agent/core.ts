@@ -14,6 +14,11 @@ import type { SafetyConfig } from "../utils/safety.js";
 import { gitStatus, gitDiff, gitLog, gitBranch, gitCommit } from "../tools/git.js";
 import { searchInFiles } from "../context/grep.js";
 import type { Config } from "../config/schema.js";
+import {
+  createCheckpoint,
+  rollback as checkpointRollback,
+  cleanupCheckpoint,
+} from "../memory/checkpoint.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,10 +109,37 @@ export class Agent {
     this.planner.createPlan(task, []);
     this.todos.addTodo(`Plan: ${task}`);
 
-    // 2. Execute in ReAct loop
+    // 2. Create checkpoint before modifications
+    let checkpointId: string | null = null;
+    if (!this.dryRun) {
+      try {
+        const checkpoint = await createCheckpoint(this.cwd, [], task);
+        checkpointId = checkpoint.id;
+        this.memory.addMessage("system", `Checkpoint created: ${checkpoint.id}`);
+      } catch {
+        // Checkpoint creation failed, continue without it
+      }
+    }
+
+    // 3. Execute in ReAct loop
     const result = await this.reactLoop(task);
 
-    // 3. Finalize
+    // 4. Cleanup checkpoint on success, rollback on failure
+    if (checkpointId) {
+      if (result.success) {
+        await cleanupCheckpoint(checkpointId);
+      } else {
+        try {
+          await checkpointRollback(checkpointId);
+          this.memory.addMessage("system", `Rolled back to checkpoint: ${checkpointId}`);
+        } catch {
+          // Rollback failed
+        }
+        await cleanupCheckpoint(checkpointId);
+      }
+    }
+
+    // 5. Finalize
     const duration = Math.round(performance.now() - startTime);
     this.memory.addMessage("assistant", result.message);
 

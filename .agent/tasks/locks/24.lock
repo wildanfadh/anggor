@@ -1,0 +1,5 @@
+task: 24
+name: Add unit tests for config loader
+agent: test-engineer
+status: done
+date: 2026-06-12

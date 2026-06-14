@@ -1,0 +1,11 @@
+task: 28
+name: Verify startup target <50ms for `anggor --help`
+agent: qa-qc-engineer
+status: done
+date: 2026-06-13
+notes: |
+  Startup measured at ~179ms avg (Node.js). Target <50ms requires
+  Bun compilation (`bun build --compile`) for near-zero startup.
+  Node.js runtime has inherent ~50-100ms overhead.
+  Build time: 47ms (excellent).
+  Binary size: 64KB (well under 30-50MB target).

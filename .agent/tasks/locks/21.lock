@@ -1,0 +1,5 @@
+task: 21
+name: Add OpenRouter / Groq / DeepSeek provider support
+agent: fullstack-engineer
+status: done
+date: 2026-06-12

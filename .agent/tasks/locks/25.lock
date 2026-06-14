@@ -1,0 +1,5 @@
+task: 25
+name: Add unit tests for providers
+agent: test-engineer
+status: done
+date: 2026-06-12

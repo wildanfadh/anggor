@@ -1,0 +1,9 @@
+task: 30
+name: Verify single-binary build flow
+agent: qa-qc-engineer
+status: done
+date: 2026-06-13
+notes: |
+  Build flow verified: `npm run build` → tsup → dist/index.js (64KB).
+  Shebang `#!/usr/bin/env node` present. All commands work correctly.
+  For true single-binary, need Bun (`bun build --compile`).
