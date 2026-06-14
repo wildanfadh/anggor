@@ -2,7 +2,7 @@
  * File Tools Tests
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtemp, rm, readFile as fsReadFile } from "node:fs/promises";

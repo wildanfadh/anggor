@@ -2,7 +2,7 @@
  * Terminal/Shell Tools Tests
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { execCommand } from "./terminal.js";
 import { checkCommandSafety, buildSafeEnv } from "../utils/safety.js";
 import type { SafetyConfig } from "../utils/safety.js";

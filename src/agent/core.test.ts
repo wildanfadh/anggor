@@ -4,7 +4,7 @@
  * Tests the full agent loop with mock configuration.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { Agent } from "./core.js";
 import type { Config } from "../config/schema.js";
 

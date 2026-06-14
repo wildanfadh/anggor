@@ -2,7 +2,7 @@
  * Config Loader Tests
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { ConfigSchema, ProviderNameSchema, ApprovalModeSchema } from "./schema.js";
 import { resolveConfigPaths } from "./paths.js";
 
@@ -61,7 +61,8 @@ describe("Config Schema", () => {
 describe("Config Paths", () => {
   it("should resolve project config path", () => {
     const paths = resolveConfigPaths("/test/project");
-    expect(paths.projectConfigPath).toContain("anggor.config.json");
+    expect(paths.projectConfigPath).toContain(".anggor.json");
+    expect(paths.legacyProjectConfigPath).toContain("anggor.config.json");
   });
 
   it("should resolve user config path", () => {

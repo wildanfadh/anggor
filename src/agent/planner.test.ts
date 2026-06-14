@@ -2,7 +2,7 @@
  * Planner Tests
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { Planner } from "./planner.js";
 import { SessionMemory } from "./memory.js";
 

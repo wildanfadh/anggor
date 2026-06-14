@@ -2,7 +2,7 @@
  * Session Memory Tests
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { SessionMemory } from "./memory.js";
 
 describe("SessionMemory", () => {

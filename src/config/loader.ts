@@ -6,7 +6,7 @@ import {
   ConfigSchema,
   ProviderNameSchema,
 } from "./schema.js";
-import { resolveConfigPaths } from "./paths.js";
+import { resolveConfigPaths, resolveEffectiveProjectConfig } from "./paths.js";
 
 interface LoadConfigOptions {
   cwd?: string;
@@ -197,7 +197,8 @@ function envToConfig(env: NodeJS.ProcessEnv): Record<string, unknown> {
 
 async function loadRawConfigSources(options: LoadConfigOptions): Promise<RawConfigSources> {
   const { cwd = process.cwd(), env = process.env } = options;
-  const { projectConfigPath, userConfigPath } = resolveConfigPaths(cwd);
+  const projectConfigPath = resolveEffectiveProjectConfig(cwd);
+  const { userConfigPath } = resolveConfigPaths(cwd);
 
   const [user, project] = await Promise.all([
     readJsonFile(userConfigPath),

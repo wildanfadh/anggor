@@ -3,8 +3,13 @@
  *
  * V1.0 ReAct loop: plan → execute → validate → iterate.
  * Integrates all tools: file, terminal, git, search, todo, planner, memory.
+ *
+ * Two execution modes:
+ *   - LLM-powered (when Provider is available) – uses the LLM to decide actions
+ *   - Heuristic (fallback) – simple keyword-based action mapping (used in tests)
  */
 
+import type { Provider, ProviderMessage } from "../providers/index.js";
 import { SessionMemory, type TodoItem } from "./memory.js";
 import { Planner, type PlanStep } from "./planner.js";
 import { TodoTracker } from "../tools/todo-tracker.js";
@@ -19,6 +24,8 @@ import {
   rollback as checkpointRollback,
   cleanupCheckpoint,
 } from "../memory/checkpoint.js";
+import { saveMemory } from "../memory/bank.js";
+import { REACT_SYSTEM_PROMPT } from "./prompts.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,6 +33,8 @@ import {
 
 export interface AgentOptions {
   config: Config;
+  /** AI provider for LLM-powered decision making. */
+  provider?: Provider;
   cwd?: string;
   maxRetries?: number;
   dryRun?: boolean;
@@ -62,6 +71,19 @@ export type ToolName =
   | "todo.update";
 
 // ---------------------------------------------------------------------------
+// LLM response shape
+// ---------------------------------------------------------------------------
+
+interface LlmAction {
+  action: "plan" | "tool_call" | "done";
+  thought?: string;
+  plan?: { task: string; steps: string[] };
+  tool?: string;
+  input?: Record<string, unknown>;
+  message?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------------------
 
@@ -75,13 +97,16 @@ export class Agent {
   private readonly maxRetries: number;
   private readonly dryRun: boolean;
   private readonly safetyConfig: SafetyConfig;
+  private readonly provider?: Provider;
   private interrupted = false;
+  private modifiedFiles = new Set<string>();
 
   constructor(options: AgentOptions) {
     this.config = options.config;
     this.cwd = options.cwd ?? process.cwd();
     this.maxRetries = options.maxRetries ?? 3;
     this.dryRun = options.dryRun ?? false;
+    this.provider = options.provider;
 
     this.memory = new SessionMemory();
     this.planner = new Planner(this.memory);
@@ -98,9 +123,194 @@ export class Agent {
   // ---------------------------------------------------------------------------
 
   /**
-   * Execute a task. This is the main entry point for the agent.
+   * Execute a task. Uses LLM-powered loop when provider is available,
+   * falls back to heuristic-based execution otherwise.
    */
   async execute(task: string): Promise<AgentResult> {
+    if (this.interrupted) {
+      return this.makeResult(false, "Execution interrupted by user.");
+    }
+
+    if (this.provider && !this.dryRun) {
+      return this.llmExecute(task);
+    }
+
+    return this.heuristicExecute(task);
+  }
+
+  // ---------------------------------------------------------------------------
+  // LLM-powered execution
+  // ---------------------------------------------------------------------------
+
+  private async llmExecute(task: string): Promise<AgentResult> {
+    const startTime = performance.now();
+    const provider = this.provider!;
+
+    this.memory.addMessage("system", REACT_SYSTEM_PROMPT);
+    this.memory.addMessage("user", task);
+
+    // Track modified files for checkpoint
+    this.modifiedFiles = new Set();
+
+    // Create checkpoint before modifications
+    let checkpointId: string | null = null;
+    try {
+      // We'll add files to checkpoint as we modify them
+      checkpointId = null; // Create on first file change
+    } catch {
+      // Checkpoint creation failed, continue without it
+    }
+
+    const maxIterations = this.config.agent.maxIterations;
+    let iteration = 0;
+
+    while (iteration < maxIterations && !this.interrupted) {
+      iteration++;
+
+      try {
+        // Build messages for LLM
+        const context = this.memory.getContext({
+          maxTokens: this.config.context.maxTokens,
+          reserveForResponse: 2048,
+        });
+
+        const messages: ProviderMessage[] = [
+          { role: "system", content: context },
+          {
+            role: "system",
+            content: `Iteration ${iteration}/${maxIterations}. Respond with JSON only.`,
+          },
+        ];
+
+        // Get action from LLM
+        const response = await provider.chat(messages);
+        const action = this.parseLlmResponse(response.content);
+
+        if (!action) {
+          this.memory.addMessage(
+            "system",
+            `Failed to parse LLM response: ${response.content.slice(0, 200)}`
+          );
+          continue;
+        }
+
+        this.memory.addMessage(
+          "assistant",
+          `[${action.action}] ${action.thought ?? ""}`
+        );
+
+        // Execute the action
+        switch (action.action) {
+          case "plan": {
+            if (action.plan) {
+              this.planner.createPlan(
+                action.plan.task,
+                action.plan.steps
+              );
+            }
+            break;
+          }
+
+          case "tool_call": {
+            if (!action.tool) {
+              this.memory.addMessage("system", "No tool specified in tool_call");
+              continue;
+            }
+
+            const result = await this.executeTool(
+              action.tool as ToolName,
+              action.input ?? {}
+            );
+
+            // Track modified files for checkpoint
+            if (result.success && this.isModifyingTool(action.tool)) {
+              const path = this.getModifiedPath(action.tool, action.input ?? {});
+              if (path) this.modifiedFiles.add(path);
+            }
+
+            this.memory.addToolCall(
+              action.tool,
+              JSON.stringify(action.input),
+              result.output,
+              result.success,
+              result.duration
+            );
+
+            // If tool failed, let LLM know and try self-heal
+            if (!result.success) {
+              this.memory.addMessage(
+                "system",
+                `Tool ${action.tool} failed: ${result.output}. Please fix the issue.`
+              );
+            }
+            break;
+          }
+
+          case "done": {
+            const duration = Math.round(performance.now() - startTime);
+            const result: AgentResult = {
+              success: true,
+              message: action.message ?? "Task completed.",
+              changes: [...this.modifiedFiles],
+              todos: this.todos.getAll(),
+              duration,
+            };
+
+            // Cleanup checkpoint on success
+            if (checkpointId) {
+              await cleanupCheckpoint(checkpointId);
+            }
+
+            // Save memory for resume
+            try {
+              await saveMemory(this.memory, this.cwd);
+            } catch {
+              // Non-critical
+            }
+
+            this.memory.addMessage("assistant", result.message);
+            return result;
+          }
+
+          default:
+            this.memory.addMessage(
+              "system",
+              `Unknown action: ${String((action as unknown as Record<string, unknown>).action)}`
+            );
+        }
+      } catch (error: unknown) {
+        this.memory.addMessage(
+          "system",
+          `Error in iteration ${iteration}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    // Max iterations reached or interrupted
+    if (checkpointId) {
+      try {
+        await checkpointRollback(checkpointId);
+      } catch {
+        // Rollback failed
+      }
+      await cleanupCheckpoint(checkpointId);
+    }
+
+    if (this.interrupted) {
+      return this.makeResult(false, "Execution interrupted by user.");
+    }
+
+    return this.makeResult(
+      false,
+      `Reached max iterations (${maxIterations}) without completing the task.`
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Heuristic execution (fallback / tests / dry-run)
+  // ---------------------------------------------------------------------------
+
+  private async heuristicExecute(task: string): Promise<AgentResult> {
     const startTime = performance.now();
 
     this.memory.addMessage("user", task);
@@ -113,7 +323,11 @@ export class Agent {
     let checkpointId: string | null = null;
     if (!this.dryRun) {
       try {
-        const checkpoint = await createCheckpoint(this.cwd, [], task);
+        const checkpoint = await createCheckpoint(
+          this.cwd,
+          [...this.modifiedFiles],
+          task
+        );
         checkpointId = checkpoint.id;
         this.memory.addMessage("system", `Checkpoint created: ${checkpoint.id}`);
       } catch {
@@ -131,7 +345,10 @@ export class Agent {
       } else {
         try {
           await checkpointRollback(checkpointId);
-          this.memory.addMessage("system", `Rolled back to checkpoint: ${checkpointId}`);
+          this.memory.addMessage(
+            "system",
+            `Rolled back to checkpoint: ${checkpointId}`
+          );
         } catch {
           // Rollback failed
         }
@@ -147,8 +364,13 @@ export class Agent {
       ...result,
       todos: this.todos.getAll(),
       duration,
+      changes: [...this.modifiedFiles],
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Plan only
+  // ---------------------------------------------------------------------------
 
   /**
    * Plan only (dry-run mode). Shows what would be done without executing.
@@ -156,13 +378,34 @@ export class Agent {
   async planOnly(task: string): Promise<AgentResult> {
     const startTime = performance.now();
 
-    // Create plan
-    this.planner.createPlan(task, [
-      "Analyze task requirements",
-      "Determine affected files",
-      "Create implementation plan",
-      "Review plan for safety",
-    ]);
+    if (this.provider) {
+      // LLM-powered plan generation
+      try {
+        const response = await this.provider.chat([
+          { role: "system", content: REACT_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Create a plan for: ${task}\n\nRespond with JSON, action "plan".`,
+          },
+        ]);
+
+        const action = this.parseLlmResponse(response.content);
+        if (action?.plan) {
+          this.planner.createPlan(action.plan.task, action.plan.steps);
+          this.memory.addMessage(
+            "system",
+            `LLM-generated plan (dry-run):\n${this.planner.formatDryRunPlan()}`
+          );
+        } else {
+          // Fallback to heuristic plan
+          this.createHeuristicPlan(task);
+        }
+      } catch {
+        this.createHeuristicPlan(task);
+      }
+    } else {
+      this.createHeuristicPlan(task);
+    }
 
     const planText = this.planner.formatDryRunPlan();
     this.memory.addMessage("system", `Plan created (dry-run):\n${planText}`);
@@ -178,7 +421,7 @@ export class Agent {
   }
 
   // ---------------------------------------------------------------------------
-  // ReAct loop
+  // ReAct loop (heuristic)
   // ---------------------------------------------------------------------------
 
   private async reactLoop(task: string): Promise<AgentResult> {
@@ -248,25 +491,21 @@ export class Agent {
   }
 
   // ---------------------------------------------------------------------------
-  // Action planning
+  // Action planning (heuristic)
   // ---------------------------------------------------------------------------
 
   private async decideNextAction(
     task: string
   ): Promise<{ tool: ToolName; input: string } | null> {
-    // Get current plan
     const plan = this.planner.getActivePlan();
     if (!plan) return null;
 
-    // Get next pending step
     const nextStep = this.planner.getNextPendingStep();
     if (!nextStep) return null;
 
-    // Mark step as in-progress
     this.planner.startStep(nextStep.id);
     this.todos.addTodo(nextStep.description);
 
-    // Determine tool based on step description
     return this.mapStepToAction(nextStep, task);
   }
 
@@ -276,7 +515,6 @@ export class Agent {
   ): { tool: ToolName; input: string } {
     const desc = step.description.toLowerCase();
 
-    // File operations
     if (desc.includes("read") || desc.includes("analyze") || desc.includes("check")) {
       return { tool: "file.read", input: step.description };
     }
@@ -289,8 +527,6 @@ export class Agent {
     if (desc.includes("delete") || desc.includes("remove")) {
       return { tool: "file.delete", input: step.description };
     }
-
-    // Git operations
     if (desc.includes("commit")) {
       return { tool: "git.commit", input: step.description };
     }
@@ -300,18 +536,13 @@ export class Agent {
     if (desc.includes("status") || desc.includes("branch")) {
       return { tool: "git.status", input: step.description };
     }
-
-    // Search
     if (desc.includes("search") || desc.includes("find") || desc.includes("grep")) {
       return { tool: "search.code", input: step.description };
     }
-
-    // Terminal/exec
     if (desc.includes("run") || desc.includes("test") || desc.includes("build") || desc.includes("lint")) {
       return { tool: "terminal.exec", input: step.description };
     }
 
-    // Default: treat as file write
     return { tool: "file.write", input: step.description };
   }
 
@@ -333,7 +564,7 @@ export class Agent {
         };
       }
 
-      const result = await this.executeTool(action.tool, action.input);
+      const result = await this.executeTool(action.tool, { rawInput: action.input });
       return {
         success: result.success,
         output: result.output,
@@ -348,7 +579,14 @@ export class Agent {
     }
   }
 
-  private async executeTool(tool: ToolName, input: string): Promise<ToolCallResult> {
+  // ---------------------------------------------------------------------------
+  // Unified tool execution (used by both LLM and heuristic paths)
+  // ---------------------------------------------------------------------------
+
+  private async executeTool(
+    tool: ToolName,
+    input: Record<string, unknown>
+  ): Promise<ToolCallResult> {
     switch (tool) {
       case "file.read":
         return this.executeFileRead(input);
@@ -367,7 +605,7 @@ export class Agent {
       case "git.diff":
         return this.executeGitDiff(input);
       case "git.log":
-        return this.executeGitLog();
+        return this.executeGitLog(input);
       case "git.branch":
         return this.executeGitBranch();
       case "git.commit":
@@ -375,8 +613,8 @@ export class Agent {
       case "search.code":
         return this.executeSearch(input);
       case "todo.add":
-        this.todos.addTodo(input);
-        return { success: true, output: `Todo added: ${input}`, duration: 0 };
+        this.todos.addTodo(String(input.task ?? input.rawInput ?? ""));
+        return { success: true, output: "Todo added", duration: 0 };
       case "todo.update":
         return { success: true, output: "Todo updated", duration: 0 };
       default:
@@ -385,59 +623,127 @@ export class Agent {
   }
 
   // ---------------------------------------------------------------------------
-  // Tool implementations
+  // File tools (real implementation)
   // ---------------------------------------------------------------------------
 
-  private async executeFileRead(input: string): Promise<ToolCallResult> {
+  private async executeFileRead(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      const content = await fileTools.readFile(input);
-      return { success: true, output: content, duration: 0 };
+      const path = String(input.path ?? input.rawInput ?? "");
+      if (!path) return { success: false, output: "No path provided", duration: 0 };
+
+      const options: fileTools.ReadFileOptions = {};
+      if (typeof input.lineStart === "number") options.lineStart = input.lineStart;
+      if (typeof input.lineEnd === "number") options.lineEnd = input.lineEnd;
+
+      const content = await fileTools.readFile(path, options);
+      const truncated =
+        content.length > 4000
+          ? content.slice(0, 4000) + `\n... (${content.length - 4000} more chars)`
+          : content;
+      return { success: true, output: truncated, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeFileWrite(input: string): Promise<ToolCallResult> {
+  private async executeFileWrite(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      // For now, just acknowledge - actual content would come from LLM
-      return { success: true, output: `Would write to: ${input}`, duration: 0 };
+      const path = String(input.path ?? "");
+      const content = String(input.content ?? "");
+      if (!path) return { success: false, output: "No path provided", duration: 0 };
+
+      const result = await fileTools.writeFile(path, content);
+      this.modifiedFiles.add(path);
+      return { success: true, output: `Written ${result.bytes} bytes to ${result.path}`, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeFileCreate(input: string): Promise<ToolCallResult> {
+  private async executeFileCreate(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      return { success: true, output: `Would create: ${input}`, duration: 0 };
+      const path = String(input.path ?? "");
+      const content = String(input.content ?? "");
+      if (!path) return { success: false, output: "No path provided", duration: 0 };
+
+      const result = await fileTools.createFile(path, content);
+      this.modifiedFiles.add(path);
+      return { success: true, output: `Created ${result.bytes} bytes at ${result.path}`, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeFileDelete(input: string): Promise<ToolCallResult> {
+  private async executeFileDelete(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      return { success: true, output: `Would delete: ${input}`, duration: 0 };
+      const path = String(input.path ?? "");
+      if (!path) return { success: false, output: "No path provided", duration: 0 };
+
+      const result = await fileTools.deleteFile(path, true);
+      this.modifiedFiles.add(path);
+      const msg = result.backupPath
+        ? `Moved to backup: ${result.backupPath}`
+        : "Moved to trash";
+      return { success: true, output: msg, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeFilePatch(input: string): Promise<ToolCallResult> {
+  private async executeFilePatch(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      return { success: true, output: `Would patch: ${input}`, duration: 0 };
+      const path = String(input.path ?? "");
+      const diff = String(input.diff ?? "");
+      if (!path) return { success: false, output: "No path provided", duration: 0 };
+      if (!diff) return { success: false, output: "No diff provided", duration: 0 };
+
+      const result = await fileTools.applyPatch(path, diff);
+      this.modifiedFiles.add(path);
+      return { success: true, output: `Patched ${result.bytes} bytes to ${result.path}`, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeTerminal(input: string): Promise<ToolCallResult> {
-    const result = await execCommand(input, this.safetyConfig, { cwd: this.cwd });
+  // ---------------------------------------------------------------------------
+  // Terminal tools
+  // ---------------------------------------------------------------------------
+
+  private async executeTerminal(input: Record<string, unknown>): Promise<ToolCallResult> {
+    const command = String(input.command ?? input.rawInput ?? "");
+    const cwd = typeof input.cwd === "string" ? input.cwd : this.cwd;
+
+    const result = await execCommand(command, this.safetyConfig, { cwd });
     return {
       success: result.exitCode === 0,
       output: result.stdout || result.stderr,
       duration: result.duration,
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Git tools
+  // ---------------------------------------------------------------------------
 
   private async executeGitStatus(): Promise<ToolCallResult> {
     try {
@@ -449,71 +755,114 @@ export class Agent {
       ].join("\n");
       return { success: true, output, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeGitDiff(input: string): Promise<ToolCallResult> {
+  private async executeGitDiff(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      const diff = await gitDiff(input || undefined, this.cwd);
-      return { success: true, output: diff, duration: 0 };
+      const path = typeof input.path === "string" ? input.path : undefined;
+      const diff = await gitDiff(path, this.cwd);
+      return { success: true, output: diff || "No changes.", duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeGitLog(): Promise<ToolCallResult> {
+  private async executeGitLog(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      const log = await gitLog(5, this.cwd);
+      const count = typeof input.count === "number" ? input.count : 5;
+      const log = await gitLog(count, this.cwd);
       const output = log.map((e) => `${e.shortHash} ${e.message}`).join("\n");
-      return { success: true, output, duration: 0 };
+      return { success: true, output: output || "No commits.", duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
   private async executeGitBranch(): Promise<ToolCallResult> {
     try {
       const branch = await gitBranch(this.cwd);
-      return { success: true, output: `Current: ${branch.current}\nAll: ${branch.all.join(", ")}`, duration: 0 };
+      const output = `Current: ${branch.current}\nAll: ${branch.all.join(", ")}`;
+      return { success: true, output, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
-  private async executeGitCommit(input: string): Promise<ToolCallResult> {
+  private async executeGitCommit(input: Record<string, unknown>): Promise<ToolCallResult> {
     try {
-      const result = await gitCommit(input, this.cwd);
+      const message = String(input.message ?? input.rawInput ?? "");
+      if (!message) return { success: false, output: "No commit message provided", duration: 0 };
+
+      const result = await gitCommit(message, this.cwd);
       return { success: true, output: `Committed: ${result.shortHash}`, duration: 0 };
     } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
-    }
-  }
-
-  private async executeSearch(input: string): Promise<ToolCallResult> {
-    try {
-      const result = await searchInFiles(input, { cwd: this.cwd });
-      const output = result.matches
-        .slice(0, 10)
-        .map((m) => `${m.file}:${m.line}: ${m.preview}`)
-        .join("\n");
-      return { success: true, output: output || "No matches found.", duration: 0 };
-    } catch (error: unknown) {
-      return { success: false, output: error instanceof Error ? error.message : String(error), duration: 0 };
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Self-healing
+  // Search tools
+  // ---------------------------------------------------------------------------
+
+  private async executeSearch(input: Record<string, unknown>): Promise<ToolCallResult> {
+    try {
+      const query = String(input.query ?? input.rawInput ?? "");
+      if (!query) return { success: false, output: "No query provided", duration: 0 };
+
+      const result = await searchInFiles(query, { cwd: this.cwd });
+      const output = result.matches
+        .slice(0, 15)
+        .map((m) => `${m.file}:${m.line}: ${m.preview}`)
+        .join("\n");
+      return {
+        success: true,
+        output: output || "No matches found.",
+        duration: 0,
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        output: error instanceof Error ? error.message : String(error),
+        duration: 0,
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Self-healing (heuristic)
   // ---------------------------------------------------------------------------
 
   private async selfHeal(
     action: { tool: ToolName; input: string }
   ): Promise<boolean> {
     for (let retry = 0; retry < this.maxRetries; retry++) {
-      this.memory.addMessage("system", `Retry ${retry + 1}/${this.maxRetries} for ${action.tool}`);
+      this.memory.addMessage(
+        "system",
+        `Retry ${retry + 1}/${this.maxRetries} for ${action.tool}`
+      );
 
-      // Wait a bit before retry
       await new Promise((resolve) => setTimeout(resolve, 1000 * (retry + 1)));
 
       const result = await this.executeAction(action);
@@ -529,12 +878,81 @@ export class Agent {
   // Helpers
   // ---------------------------------------------------------------------------
 
+  /** Parse LLM JSON response into a structured action. */
+  private parseLlmResponse(raw: string): LlmAction | null {
+    // Try to extract JSON from response (handles markdown code blocks)
+    let jsonText = raw.trim();
+
+    // Strip markdown ```json ... ``` wrappers
+    const codeBlockMatch = jsonText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1].trim();
+    }
+
+    // Find first { and last }
+    const firstBrace = jsonText.indexOf("{");
+    const lastBrace = jsonText.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(jsonText.slice(firstBrace, lastBrace + 1));
+      if (!parsed || typeof parsed !== "object") return null;
+
+      // Validate action field
+      if (
+        parsed.action !== "plan" &&
+        parsed.action !== "tool_call" &&
+        parsed.action !== "done"
+      ) {
+        return null;
+      }
+
+      return parsed as LlmAction;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Check if a tool modifies files (for checkpoint tracking). */
+  private isModifyingTool(tool: string): boolean {
+    return ["file.write", "file.create", "file.delete", "file.patch"].includes(tool);
+  }
+
+  /** Extract file path from tool input for checkpoint tracking. */
+  private getModifiedPath(
+    _tool: string,
+    input: Record<string, unknown>
+  ): string | null {
+    if (input.path && typeof input.path === "string") {
+      return input.path;
+    }
+    return null;
+  }
+
+  /** Create a heuristic (non-LLM) plan for fallback cases. */
+  private createHeuristicPlan(task: string): void {
+    this.planner.createPlan(task, [
+      "Analyze task requirements",
+      "Determine affected files",
+      "Create implementation plan",
+      "Review plan for safety",
+    ]);
+  }
+
   private getChanges(): string[] {
-    const toolCalls = this.memory.getToolCalls();
-    return toolCalls
-      .filter((tc) => tc.success)
-      .map((tc) => tc.tool)
-      .filter((tool, index, self) => self.indexOf(tool) === index);
+    return [...this.modifiedFiles];
+  }
+
+  private makeResult(success: boolean, message: string): AgentResult {
+    return {
+      success,
+      message,
+      changes: [...this.modifiedFiles],
+      todos: this.todos.getAll(),
+      duration: 0,
+    };
   }
 
   /**

@@ -2,7 +2,7 @@
  * Context Scanner Tests
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { Scanner } from "./scanner.js";
 import { parsePackageJson } from "./manifest.js";
 import { searchInFiles, detectSearchEngine } from "./grep.js";

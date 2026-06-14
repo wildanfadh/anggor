@@ -14,25 +14,35 @@ Anggor adalah AI Coding Agent berbasis CLI yang dirancang untuk developer yang m
 | Git-Aware Workflow (status, diff, commit) | ✅ |
 | Session Memory (dalam sesi) | ✅ |
 | Planning Mode + Todo Tracking | ✅ |
-| Streaming Output | ✅ |
+| Streaming Output | 🚧 |
 | Dry-run Mode | ✅ |
 | Interrupt Handling (Ctrl+C) | ✅ |
-| Single Provider per Session | ✅ |
+| LLM-Powered ReAct Loop | ✅ |
+| Interactive Chat Mode | ✅ |
+| File Explain (LLM) | ✅ |
+| Auto Commit Message (LLM) | ✅ |
+| Provider List/Use CLI | ✅ |
+| Persistent Memory (antar sesi) | ✅ |
 
 ## Quick Start
 
+Prerequisite: Bun >= 1.1.0
+
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Run in development mode
-npm run dev
+bun run dev
 
-# Build
-npm run build
+# Build Bun bundle
+bun run build
+
+# Compile single binary
+bun run compile
 
 # Run tests
-npm test
+bun test
 ```
 
 ## CLI Commands
@@ -85,7 +95,7 @@ anggor config set approvalMode balanced
 
 ## Configuration
 
-Anggor uses `anggor.config.json` in the project root:
+Anggor uses `.anggor.json` in the project root (also reads `anggor.config.json` for backwards compatibility):
 
 ```json
 {
@@ -182,7 +192,6 @@ anggor/
 │       └── interrupt.ts         # Interrupt handling
 ├── package.json
 ├── tsconfig.json
-├── tsup.config.ts
 └── README.md
 ```
 
@@ -190,14 +199,14 @@ anggor/
 
 | Komponen | Teknologi | Alasan |
 |----------|-----------|--------|
-| Runtime | Bun / Node.js | Startup cepat |
+| Runtime | Bun | Startup cepat dan single binary |
 | Bahasa | TypeScript | Type safety |
 | CLI UI | @clack/prompts | Layout vertikal bersih |
 | Warna | picocolors | Ultra ringan |
 | AI SDK | Vercel AI SDK | Tool calling dan streaming |
 | Validasi | Zod | Validasi input |
-| Build | tsup | Fast bundling |
-| Test | Vitest | Unit & integration tests |
+| Build | bun build | Bundling dan compile ke binary |
+| Test | bun test | Unit & integration tests |
 
 ## Target Performa
 
@@ -212,22 +221,25 @@ anggor/
 
 ```bash
 # Development mode
-npm run dev
+bun run dev
 
-# Build
-npm run build
+# Build Bun bundle
+bun run build
+
+# Compile single binary
+bun run compile
 
 # Run tests
-npm test
+bun test
 
 # Watch mode
-npm run test:watch
+bun run test:watch
 
 # Type check
-npm run typecheck
+bun run typecheck
 
 # Clean
-npm run clean
+bun run clean
 ```
 
 ## Roadmap
