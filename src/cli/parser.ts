@@ -3,6 +3,7 @@ import type {
 	ConfigCommand,
 	CostCommand,
 	ExplainCommand,
+	ExtensionCommand,
 	GlobalFlag,
 	McpCommand,
 	ParseResult,
@@ -59,11 +60,11 @@ function createSimpleCommand<T extends CommitCommand | ResumeCommand | ReviewCom
 }
 
 function createGroupCommand(
-	name: "mcp" | "skill" | "provider" | "cost" | "plugin" | "config",
+	name: "mcp" | "skill" | "provider" | "cost" | "plugin" | "extension" | "config",
 	rawArgs: string[],
 	flags: GlobalFlag[],
 	args: string[],
-): McpCommand | SkillCommand | ProviderCommand | CostCommand | PluginCommand | ConfigCommand {
+): McpCommand | SkillCommand | ProviderCommand | CostCommand | PluginCommand | ExtensionCommand | ConfigCommand {
 	const [subcommand, ...restArgs] = args;
 	return {
 		name,
@@ -169,6 +170,12 @@ export function parseArgv(argv: string[]): ParseResult {
 			return {
 				ok: true,
 				command: createGroupCommand("plugin", rawArgs, flags, tail),
+			};
+
+		case "extension":
+			return {
+				ok: true,
+				command: createGroupCommand("extension", rawArgs, flags, tail),
 			};
 
 		case "config":

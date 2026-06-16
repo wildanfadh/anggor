@@ -643,6 +643,84 @@ export async function routeCommand(command: ParsedCommand, context: RuntimeConte
 		}
 
 		// =====================================================================
+		// Extension management (unified system)
+		// =====================================================================
+		case "extension": {
+			registerSimpleInterrupt();
+			const subcommand = command.subcommand ?? "list";
+
+			if (subcommand === "list") {
+				const { ExtensionLoader } = await import("../extensions/loader.js");
+				const loader = new ExtensionLoader();
+				await loader.loadAll();
+
+				const extensions = loader.list();
+				if (extensions.length === 0) {
+					printMuted("No extensions installed.");
+					printMuted("Place extensions in ~/.anggor/extensions/ or .anggor/extensions/.");
+				} else {
+					const { printTable } = await import("../ui/cliui.js");
+					const rows = extensions.map((ext) => [
+						ext.name,
+						ext.manifest.type ?? "hybrid",
+						ext.manifest.version,
+						ext.manifest.description ?? "",
+					]);
+					printTable(["Name", "Type", "Version", "Description"], rows);
+				}
+			} else if (subcommand === "install") {
+				const extPath = command.args?.[0];
+				if (!extPath) {
+					printMuted("Usage: anggor extension install <path-to-extension>");
+					return;
+				}
+
+				printMuted("Extension install: coming soon.");
+			} else if (subcommand === "remove") {
+				const extName = command.args?.[0];
+				if (!extName) {
+					printMuted("Usage: anggor extension remove <name>");
+					return;
+				}
+
+				try {
+					const { ExtensionLoader } = await import("../extensions/loader.js");
+					const loader = new ExtensionLoader();
+					await loader.remove(extName);
+					printSuccess(`Extension removed: ${extName}`);
+				} catch (error: unknown) {
+					printWarning(`Failed to remove extension: ${error instanceof Error ? error.message : String(error)}`);
+				}
+			} else if (subcommand === "info") {
+				const extName = command.args?.[0];
+				if (!extName) {
+					printMuted("Usage: anggor extension info <name>");
+					return;
+				}
+
+				const { ExtensionLoader } = await import("../extensions/loader.js");
+				const loader = new ExtensionLoader();
+				await loader.loadAll();
+
+				const ext = loader.get(extName);
+				if (!ext) {
+					printWarning(`Extension not found: ${extName}`);
+					return;
+				}
+
+				printInfo(`Extension: ${ext.manifest.name}`);
+				printMuted(`  Version: ${ext.manifest.version}`);
+				printMuted(`  Type: ${ext.manifest.type ?? "hybrid"}`);
+				if (ext.manifest.description) printMuted(`  Description: ${ext.manifest.description}`);
+				if (ext.manifest.author) printMuted(`  Author: ${ext.manifest.author}`);
+				printMuted(`  Path: ${ext.path}`);
+			} else {
+				printMuted(`Unknown extension subcommand: ${subcommand}`);
+			}
+			return;
+		}
+
+		// =====================================================================
 		// Config management
 		// =====================================================================
 		case "config": {

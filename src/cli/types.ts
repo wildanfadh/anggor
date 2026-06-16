@@ -14,6 +14,7 @@ export type TopLevelCommandName =
 	| "provider"
 	| "cost"
 	| "plugin"
+	| "extension"
 	| "config";
 
 export interface ParsedBaseCommand {
@@ -85,6 +86,12 @@ export interface PluginCommand extends ParsedBaseCommand {
 	args: string[];
 }
 
+export interface ExtensionCommand extends ParsedBaseCommand {
+	name: "extension";
+	subcommand?: GroupSubcommand;
+	args: string[];
+}
+
 export interface ConfigCommand extends ParsedBaseCommand {
 	name: "config";
 	subcommand?: GroupSubcommand;
@@ -109,6 +116,7 @@ export type ParsedCommand =
 	| ProviderCommand
 	| CostCommand
 	| PluginCommand
+	| ExtensionCommand
 	| ConfigCommand;
 
 export interface ParseResultSuccess {
