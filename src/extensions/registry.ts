@@ -4,8 +4,8 @@
  * Manages loaded extensions and provides access to their capabilities.
  */
 
-import type { Extension, ExtensionTool, ExtensionHook } from "./types.js";
 import type { Provider } from "../providers/index.js";
+import type { Extension, ExtensionHook, ExtensionTool } from "./types.js";
 
 export class ExtensionRegistry {
 	private extensions = new Map<string, Extension>();

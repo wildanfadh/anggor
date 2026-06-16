@@ -6,7 +6,7 @@
  */
 
 import { constants } from "node:fs";
-import { access, mkdir, readdir, readFile, writeFile, rm } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Extension, ExtensionContext, ExtensionManifest, InstalledExtension } from "./types.js";
