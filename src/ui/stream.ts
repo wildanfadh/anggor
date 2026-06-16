@@ -5,27 +5,27 @@
  * Gives a responsive, real-time feel to the agent.
  */
 
-import { theme } from "./theme.js";
 import { createSpinner } from "./spinner.js";
+import { theme } from "./theme.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface StreamOptions {
-  /** Prefix for each line. */
-  prefix?: string;
-  /** Show timestamps. */
-  timestamp?: boolean;
-  /** Color for the output. */
-  color?: (text: string) => string;
+	/** Prefix for each line. */
+	prefix?: string;
+	/** Show timestamps. */
+	timestamp?: boolean;
+	/** Color for the output. */
+	color?: (text: string) => string;
 }
 
 export interface ToolStreamOptions extends StreamOptions {
-  /** Show tool name. */
-  showTool?: boolean;
-  /** Show duration. */
-  showDuration?: boolean;
+	/** Show tool name. */
+	showTool?: boolean;
+	/** Show duration. */
+	showDuration?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,60 +37,57 @@ export interface ToolStreamOptions extends StreamOptions {
  * Displays tokens as they arrive in real-time.
  */
 export function createTokenStream(options: StreamOptions = {}): {
-  write: (token: string) => void;
-  end: () => void;
+	write: (token: string) => void;
+	end: () => void;
 } {
-  const { prefix = "", color } = options;
-  let lineBuffer = "";
+	const { prefix = "", color } = options;
+	let lineBuffer = "";
 
-  return {
-    write: (token: string) => {
-      // Split by newlines to handle multi-line tokens
-      const parts = token.split("\n");
+	return {
+		write: (token: string) => {
+			// Split by newlines to handle multi-line tokens
+			const parts = token.split("\n");
 
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
+			for (let i = 0; i < parts.length; i++) {
+				const part = parts[i];
 
-        if (i > 0) {
-          // Newline encountered - flush buffer
-          const line = color ? color(lineBuffer) : lineBuffer;
-          process.stdout.write(`${prefix}${line}\n`);
-          lineBuffer = "";
-        }
+				if (i > 0) {
+					// Newline encountered - flush buffer
+					const line = color ? color(lineBuffer) : lineBuffer;
+					process.stdout.write(`${prefix}${line}\n`);
+					lineBuffer = "";
+				}
 
-        lineBuffer += part;
-      }
+				lineBuffer += part;
+			}
 
-      // Write partial line (without newline)
-      if (lineBuffer) {
-        const partial = color ? color(lineBuffer) : lineBuffer;
-        process.stdout.write(`\r${prefix}${partial}`);
-      }
-    },
-    end: () => {
-      if (lineBuffer) {
-        const line = color ? color(lineBuffer) : lineBuffer;
-        process.stdout.write(`${prefix}${line}\n`);
-        lineBuffer = "";
-      }
-    },
-  };
+			// Write partial line (without newline)
+			if (lineBuffer) {
+				const partial = color ? color(lineBuffer) : lineBuffer;
+				process.stdout.write(`\r${prefix}${partial}`);
+			}
+		},
+		end: () => {
+			if (lineBuffer) {
+				const line = color ? color(lineBuffer) : lineBuffer;
+				process.stdout.write(`${prefix}${line}\n`);
+				lineBuffer = "";
+			}
+		},
+	};
 }
 
 /**
  * Stream an async iterable of tokens to the terminal.
  */
-export async function streamTokens(
-  tokens: AsyncIterable<string>,
-  options: StreamOptions = {}
-): Promise<void> {
-  const stream = createTokenStream(options);
+export async function streamTokens(tokens: AsyncIterable<string>, options: StreamOptions = {}): Promise<void> {
+	const stream = createTokenStream(options);
 
-  for await (const token of tokens) {
-    stream.write(token);
-  }
+	for await (const token of tokens) {
+		stream.write(token);
+	}
 
-  stream.end();
+	stream.end();
 }
 
 // ---------------------------------------------------------------------------
@@ -101,62 +98,57 @@ export async function streamTokens(
  * Display tool execution with spinner and progressive output.
  */
 export async function streamToolExecution<T>(
-  toolName: string,
-  description: string,
-  execute: () => Promise<T>,
-  options: ToolStreamOptions = {}
+	toolName: string,
+	description: string,
+	execute: () => Promise<T>,
+	options: ToolStreamOptions = {},
 ): Promise<T> {
-  const { showTool = true, showDuration = true } = options;
-  const spinner = createSpinner();
-  const startTime = performance.now();
+	const { showTool = true, showDuration = true } = options;
+	const spinner = createSpinner();
+	const startTime = performance.now();
 
-  const toolLabel = showTool ? theme.info(`[${toolName}]`) : "";
-  const startMsg = `${toolLabel} ${description}...`;
+	const toolLabel = showTool ? theme.info(`[${toolName}]`) : "";
+	const startMsg = `${toolLabel} ${description}...`;
 
-  spinner.start(startMsg);
+	spinner.start(startMsg);
 
-  try {
-    const result = await execute();
-    const duration = Math.round(performance.now() - startTime);
-    const durationLabel = showDuration ? theme.muted(` (${duration}ms)`) : "";
+	try {
+		const result = await execute();
+		const duration = Math.round(performance.now() - startTime);
+		const durationLabel = showDuration ? theme.muted(` (${duration}ms)`) : "";
 
-    spinner.stop(`${theme.success("✓")} ${toolLabel} ${description}${durationLabel}`);
+		spinner.stop(`${theme.success("✓")} ${toolLabel} ${description}${durationLabel}`);
 
-    return result;
-  } catch (error: unknown) {
-    const duration = Math.round(performance.now() - startTime);
-    const durationLabel = showDuration ? theme.muted(` (${duration}ms)`) : "";
+		return result;
+	} catch (error: unknown) {
+		const duration = Math.round(performance.now() - startTime);
+		const durationLabel = showDuration ? theme.muted(` (${duration}ms)`) : "";
 
-    spinner.stop(`${theme.error("✗")} ${toolLabel} ${description}${durationLabel}`);
+		spinner.stop(`${theme.error("✗")} ${toolLabel} ${description}${durationLabel}`);
 
-    throw error;
-  }
+		throw error;
+	}
 }
 
 /**
  * Display a tool call result.
  */
-export function printToolResult(
-  toolName: string,
-  success: boolean,
-  output: string,
-  duration?: number
-): void {
-  const icon = success ? theme.success("✓") : theme.error("✗");
-  const tool = theme.info(`[${toolName}]`);
-  const dur = duration !== undefined ? theme.muted(` (${duration}ms)`) : "";
+export function printToolResult(toolName: string, success: boolean, output: string, duration?: number): void {
+	const icon = success ? theme.success("✓") : theme.error("✗");
+	const tool = theme.info(`[${toolName}]`);
+	const dur = duration !== undefined ? theme.muted(` (${duration}ms)`) : "";
 
-  console.log(`${icon} ${tool}${dur}`);
+	console.log(`${icon} ${tool}${dur}`);
 
-  if (output) {
-    const lines = output.split("\n").slice(0, 5); // Show max 5 lines
-    for (const line of lines) {
-      console.log(theme.muted(`  ${line}`));
-    }
-    if (output.split("\n").length > 5) {
-      console.log(theme.muted(`  ... (${output.split("\n").length - 5} more lines)`));
-    }
-  }
+	if (output) {
+		const lines = output.split("\n").slice(0, 5); // Show max 5 lines
+		for (const line of lines) {
+			console.log(theme.muted(`  ${line}`));
+		}
+		if (output.split("\n").length > 5) {
+			console.log(theme.muted(`  ... (${output.split("\n").length - 5} more lines)`));
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -167,25 +159,23 @@ export function printToolResult(
  * Display plan steps as they're being executed.
  */
 export function printPlanStep(
-  stepNumber: number,
-  totalSteps: number,
-  description: string,
-  status: "starting" | "done" | "failed"
+	stepNumber: number,
+	totalSteps: number,
+	description: string,
+	status: "starting" | "done" | "failed",
 ): void {
-  const progress = theme.muted(`[${stepNumber}/${totalSteps}]`);
-  const icon = status === "starting" ? theme.info("→")
-    : status === "done" ? theme.success("✓")
-    : theme.error("✗");
+	const progress = theme.muted(`[${stepNumber}/${totalSteps}]`);
+	const icon = status === "starting" ? theme.info("→") : status === "done" ? theme.success("✓") : theme.error("✗");
 
-  console.log(`${icon} ${progress} ${description}`);
+	console.log(`${icon} ${progress} ${description}`);
 }
 
 /**
  * Display plan header.
  */
 export function printPlanHeader(task: string, stepCount: number): void {
-  console.log(theme.bold(theme.primary(`\nPLAN: ${task}`)));
-  console.log(theme.muted(`  ${stepCount} steps\n`));
+	console.log(theme.bold(theme.primary(`\nPLAN: ${task}`)));
+	console.log(theme.muted(`  ${stepCount} steps\n`));
 }
 
 // ---------------------------------------------------------------------------
@@ -196,16 +186,16 @@ export function printPlanHeader(task: string, stepCount: number): void {
  * Display agent iteration progress.
  */
 export function printIteration(iteration: number, maxIterations: number): void {
-  const progress = theme.muted(`[${iteration}/${maxIterations}]`);
-  console.log(theme.info(`\n${progress} Iteration ${iteration}`));
+	const progress = theme.muted(`[${iteration}/${maxIterations}]`);
+	console.log(theme.info(`\n${progress} Iteration ${iteration}`));
 }
 
 /**
  * Display agent completion.
  */
 export function printCompletion(success: boolean, message: string, duration: number): void {
-  const icon = success ? theme.success("✓") : theme.error("✗");
-  const dur = theme.muted(` (${duration}ms)`);
+	const icon = success ? theme.success("✓") : theme.error("✗");
+	const dur = theme.muted(` (${duration}ms)`);
 
-  console.log(`\n${icon} ${message}${dur}`);
+	console.log(`\n${icon} ${message}${dur}`);
 }

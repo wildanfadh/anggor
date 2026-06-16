@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anggor - Fast, Local-First, Provider-Agnostic Autonomous Coding Agent</title>
+  <meta name="description" content="Anggor is an AI coding agent for the terminal. Fast startup, local-first, provider-agnostic, autonomous execution.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ==================== CSS Variables ==================== */
+    :root {
+      /* Terminal colors */
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #16161f;
+      --bg-terminal: #0d0d14;
+      --bg-input: #1a1a25;
+      
+      /* Accent colors */
+      --accent-green: #00ff88;
+      --accent-green-dim: #00cc6a;
+      --accent-cyan: #00d4ff;
+      --accent-blue: #6366f1;
+      --accent-purple: #8b5cf6;
+      --accent-yellow: #fbbf24;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      
+      /* Text colors */
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-dim: #475569;
+      
+      /* Borders */
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --border-active: rgba(0, 255, 136, 0.3);
+      
+      /* Glow effects */
+      --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+      --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+      
+      /* Font */
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      
+      /* Sizing */
+      --header-height: 60px;
+      --max-width: 1200px;
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* ==================== Reset & Base ==================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ==================== Background Effects ==================== */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-1 {
+      top: -200px;
+      left: -100px;
+      background: var(--accent-green);
+    }
+
+    .bg-glow-2 {
+      bottom: -200px;
+      right: -100px;
+      background: var(--accent-cyan);
+    }
+
+    /* ==================== Layout ==================== */
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ==================== Header ==================== */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 100;
+      transition: background 0.3s ease;
+    }
+
+    header.scrolled {
+      background: rgba(10, 10, 15, 0.95);
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--bg-primary);
+    }
+
+    .logo-text {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-badge {
+      padding: 2px 8px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent-green);
+      font-family: var(--font-mono);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      border: none;
+      outline: none;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-primary {
+      background: var(--accent-green);
+      color: var(--bg-primary);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: #00e67a;
+      box-shadow: var(--glow-green);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-large {
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: var(--radius-lg);
+    }
+
+    /* ==================== Hero ==================== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 0 80px;
+    }
+
+    .hero-content {
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(0, 255, 136, 0.08);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-green);
+      margin-bottom: 24px;
+      font-family: var(--font-mono);
+    }
+
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .hero-title {
+      font-size: clamp(48px, 8vw, 80px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -2px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-title .highlight {
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+    }
+
+    .install-cmd {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--bg-terminal);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: all;
+    }
+
+    .install-cmd:hover {
+      border-color: var(--accent-green);
+      background: rgba(0, 255, 136, 0.05);
+    }
+
+    .install-cmd .prompt {
+      color: var(--accent-green);
+    }
+
+    .install-cmd .cmd {
+      color: var(--text-primary);
+    }
+
+    .install-cmd .copy-icon {
+      color: var(--text-muted);
+      transition: color 0.2s ease;
+    }
+
+    .install-cmd:hover .copy-icon {
+      color: var(--accent-green);
+    }
+
+    .hero-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      padding-top: 40px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent-green);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ==================== Terminal Demo ==================== */
+    .terminal-section {
+      padding: 80px 0 120px;
+    }
+
+    .terminal-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      perspective: 1000px;
+    }
+
+    .terminal {
+      background: var(--bg-terminal);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 20px 60px -20px rgba(0, 0, 0, 0.5),
+        0 0 80px -20px rgba(0, 255, 136, 0.1);
+      transform: rotateX(2deg);
+      transition: transform 0.5s ease;
+    }
+
+    .terminal:hover {
+      transform: rotateX(0deg);
+    }
+
+    .terminal-header {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .terminal-dot.red { background: #ff5f57; border-color: #e0443e; }
+    .terminal-dot.yellow { background: #febc2e; border-color: #dea123; }
+    .terminal-dot.green { background: #28c840; border-color: #1aab29; }
+
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .terminal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .terminal-btn {
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font-mono);
+    }
+
+    .terminal-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+    }
+
+    .terminal-body {
+      padding: 20px;
+      min-height: 400px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .terminal-line {
+      margin-bottom: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      animation: fadeInLine 0.3s ease forwards;
+    }
+
+    .terminal-line .prompt {
+      color: var(--accent-green);
+      user-select: none;
+    }
+
+    .terminal-line .command {
+      color: var(--text-primary);
+    }
+
+    .terminal-line .output {
+      color: var(--text-secondary);
+    }
+
+    .terminal-line .success {
+      color: var(--accent-green);
+    }
+
+    .terminal-line .info {
+      color: var(--accent-cyan);
+    }
+
+    .terminal-line .warning {
+      color: var(--accent-yellow);
+    }
+
+    .terminal-line .error {
+      color: var(--accent-red);
+    }
+
+    .terminal-line .comment {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .terminal-line .path {
+      color: var(--accent-purple);
+    }
+
+    .terminal-line .dim {
+      color: var(--text-dim);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--accent-green);
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @keyframes fadeInLine {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .typing {
+      overflow: hidden;
+      white-space: nowrap;
+      border-right: 2px solid var(--accent-green);
+      animation: typing 2s steps(40) forwards, blink 1s step-end infinite;
+    }
+
+    @keyframes typing {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+
+    /* ==================== Features ==================== */
+    .features {
+      padding: 120px 0;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .section-label {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(36px, 5vw, 48px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .section-desc {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      padding: 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-active);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(0, 212, 255, 0.1);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      margin-top: 12px;
+    }
+
+    /* ==================== Providers ==================== */
+    .providers {
+      padding: 80px 0 120px;
+    }
+
+    .providers-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .provider-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+
+    .provider-badge:hover {
+      border-color: var(--border-active);
+      transform: translateY(-2px);
+    }
+
+    .provider-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--bg-primary);
+      font-family: var(--font-mono);
+    }
+
+    .provider-name {
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    /* ==================== Comparison ==================== */
+    .comparison {
+      padding: 120px 0;
+    }
+
+    .comparison-table {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .comparison-header {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .comparison-cell {
+      padding: 16px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .comparison-cell:nth-child(2) {
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .comparison-cell:nth-child(3) {
+      text-align: center;
+      color: var(--accent-green);
+    }
+
+    .comparison-row {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .comparison-row:last-child {
+      border-bottom: none;
+    }
+
+    .comparison-row .cell {
+      padding: 14px 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .comparison-row .cell:first-child {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .comparison-row .cell:nth-child(2) {
+      text-align: center;
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .comparison-row .cell:nth-child(3) {
+      text-align: center;
+      color: var(--accent-green);
+      font-weight: 500;
+    }
+
+    /* ==================== Install ==================== */
+    .install {
+      padding: 120px 0;
+    }
+
+    .install-content {
+      max-width: 700px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .install-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-top: 40px;
+    }
+
+    .install-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      text-align: left;
+      transition: all 0.3s ease;
+    }
+
+    .install-step:hover {
+      border-color: var(--border-active);
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent-green);
+    }
+
+    .step-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .step-content p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .step-cmd {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-terminal);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-primary);
+      margin-top: 12px;
+    }
+
+    .step-cmd .prompt {
+      color: var(--accent-green);
+    }
+
+    /* ==================== CTA ==================== */
+    .cta {
+      padding: 120px 0;
+      text-align: center;
+    }
+
+    .cta-box {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 60px 40px;
+      background: linear-gradient(135deg, rgba(0, 255, 136, 0.05), rgba(0, 212, 255, 0.05));
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    }
+
+    .cta-title {
+      font-size: clamp(32px, 4vw, 40px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .cta-desc {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* ==================== Footer ==================== */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .footer-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s ease;
+    }
+
+    .footer-link:hover {
+      color: var(--text-primary);
+    }
+
+    /* ==================== Animations ==================== */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .delay-1 { transition-delay: 0.1s; }
+    .delay-2 { transition-delay: 0.2s; }
+    .delay-3 { transition-delay: 0.3s; }
+    .delay-4 { transition-delay: 0.4s; }
+
+    /* ==================== Responsive ==================== */
+    @media (max-width: 768px) {
+      .hero-stats {
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-header,
+      .comparison-row {
+        grid-template-columns: 120px 1fr 1fr;
+      }
+
+      .comparison-cell,
+      .comparison-row .cell {
+        padding: 12px 12px;
+        font-size: 12px;
+      }
+
+      nav {
+        display: none;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+      }
+
+      .footer-inner {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+    }
+
+    /* ==================== Scrollbar ==================== */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-input);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dim);
+    }
+
+    /* ==================== Selection ==================== */
+    ::selection {
+      background: rgba(0, 255, 136, 0.3);
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Effects -->
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-inner">
+      <a href="#" class="logo">
+        <div class="logo-icon">A</div>
+        <span class="logo-text">anggor</span>
+        <span class="logo-badge">v0.1.0</span>
+      </a>
+      
+      <nav>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#providers" class="nav-link">Providers</a>
+        <a href="#install" class="nav-link">Install</a>
+        <a href="https://github.com/anggor/anggor" class="nav-link" target="_blank">GitHub</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button class="btn btn-ghost" id="theme-toggle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <a href="https://github.com/anggor/anggor" class="btn btn-secondary" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          <span>Open Source • MIT License</span>
+        </div>
+        
+        <h1 class="hero-title">
+          Your AI pair programmer,<br>
+          <span class="highlight">in the terminal.</span>
+        </h1>
+        
+        <p class="hero-subtitle">
+          Anggor is a fast, local-first, provider-agnostic autonomous coding agent. 
+          It understands your codebase, makes intelligent edits, and runs commands—all 
+          from your terminal.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#install" class="btn btn-primary btn-large">
+            Get Started
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </a>
+          <div class="install-cmd" onclick="copyInstallCmd()">
+            <span class="prompt">$</span>
+            <span class="cmd">bun install -g anggor</span>
+            <span class="copy-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat">
+            <div class="stat-value">&lt;50ms</div>
+            <div class="stat-label">Startup time</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">1T</div>
+            <div class="stat-label">Parameters</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">11+</div>
+            <div class="stat-label">Providers</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">MIT</div>
+            <div class="stat-label">License</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal Demo -->
+  <section class="terminal-section">
+    <div class="container">
+      <div class="terminal-wrapper">
+        <div class="terminal" id="terminal-demo">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
+            <div class="terminal-title">anggor — ~/projects/my-app</div>
+            <div class="terminal-actions">
+              <button class="terminal-btn" onclick="replayTerminal()">Replay</button>
+            </div>
+          </div>
+          <div class="terminal-body" id="terminal-body">
+            <!-- Terminal content will be inserted here by JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Features</div>
+        <h2 class="section-title">Everything you need,<br>nothing you don't.</h2>
+        <p class="section-desc">
+          Built for developers who want power without the bloat. 
+          Every feature is designed to be fast, useful, and unobtrusive.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card fade-in">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Instant Startup</h3>
+          <p class="feature-desc">
+            Launches in under 50ms. No loading screens, no waiting. 
+            Just type and go, like any good CLI tool.
+          </p>
+          <span class="feature-tag">bun compile</span>
+        </div>
+
+        <div class="feature-card fade-in delay-1">
+          <div class="feature-icon">🏠</div>
+          <h3 class="feature-title">Local First</h3>
+          <p class="feature-desc">
+            Your code never leaves your machine unless you want it to. 
+            Scanning, indexing, and Git analysis all happen locally.
+          </p>
+          <span class="feature-tag">privacy</span>
+        </div>
+
+        <div class="feature-card fade-in delay-2">
+          <div class="feature-icon">🔌</div>
+          <h3 class="feature-title">Provider Agnostic</h3>
+          <p class="feature-desc">
+            Use OpenAI, Anthropic, Gemini, Ollama, Groq, DeepSeek, or any 
+            OpenAI-compatible API. Switch anytime.
+          </p>
+          <span class="feature-tag">flexible</span>
+        </div>
+
+        <div class="feature-card fade-in delay-3">
+          <div class="feature-icon">🤖</div>
+          <h3 class="feature-title">Autonomous Execution</h3>
+          <p class="feature-desc">
+            Plans tasks, selects tools, edits files, runs tests, and fixes 
+            errors iteratively until the job is done.
+          </p>
+          <span class="feature-tag">ReAct loop</span>
+        </div>
+
+        <div class="feature-card fade-in delay-4">
+          <div class="feature-icon">🔧</div>
+          <h3 class="feature-title">Git Aware</h3>
+          <p class="feature-desc">
+            Understands your repository. Can check status, view diffs, 
+            create commits, and work with branches intelligently.
+          </p>
+          <span class="feature-tag">git integration</span>
+        </div>
+
+        <div class="feature-card fade-in">
+          <div class="feature-icon">📦</div>
+          <h3 class="feature-title">Single Binary</h3>
+          <p class="feature-desc">
+            One executable file. No dependencies, no runtime, no hassle. 
+            Distribute and install anywhere.
+          </p>
+          <span class="feature-tag">~30MB</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Providers -->
+  <section class="providers" id="providers">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Providers</div>
+        <h2 class="section-title">Works with your favorite LLM.</h2>
+        <p class="section-desc">
+          Anggor is provider-agnostic. Use the model that works best for you.
+        </p>
+      </div>
+
+      <div class="providers-grid">
+        <div class="provider-badge">
+          <div class="provider-icon">O</div>
+          <span class="provider-name">OpenAI</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">A</div>
+          <span class="provider-name">Anthropic</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">G</div>
+          <span class="provider-name">Google</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">O</div>
+          <span class="provider-name">Ollama</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">G</div>
+          <span class="provider-name">Groq</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">D</div>
+          <span class="provider-name">DeepSeek</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">O</div>
+          <span class="provider-name">OpenRouter</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">A</div>
+          <span class="provider-name">Azure</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">O</div>
+          <span class="provider-name">OpenCode</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">C</div>
+          <span class="provider-name">CommandCode</span>
+        </div>
+        <div class="provider-badge">
+          <div class="provider-icon">M</div>
+          <span class="provider-name">Mimo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="comparison">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Comparison</div>
+        <h2 class="section-title">Why choose Anggor?</h2>
+        <p class="section-desc">
+          See how Anggor stacks up against other AI coding tools.
+        </p>
+      </div>
+
+      <div class="comparison-table">
+        <div class="comparison-header">
+          <div class="comparison-cell">Feature</div>
+          <div class="comparison-cell">Others</div>
+          <div class="comparison-cell">Anggor</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">Startup Time</div>
+          <div class="cell">2-5 seconds</div>
+          <div class="cell">&lt;50ms</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">Provider Lock-in</div>
+          <div class="cell">Yes</div>
+          <div class="cell">No</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">Local Processing</div>
+          <div class="cell">Limited</div>
+          <div class="cell">Full</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">Binary Size</div>
+          <div class="cell">100MB+</div>
+          <div class="cell">~30MB</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">Open Source</div>
+          <div class="cell">Partial</div>
+          <div class="cell">MIT</div>
+        </div>
+        <div class="comparison-row">
+          <div class="cell">MCP Support</div>
+          <div class="cell">Limited</div>
+          <div class="cell">Full</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="install" id="install">
+    <div class="container">
+      <div class="install-content">
+        <div class="section-header">
+          <div class="section-label">Install</div>
+          <h2 class="section-title">Get up and running<br>in seconds.</h2>
+          <p class="section-desc">
+            Three steps to your new AI coding companion.
+          </p>
+        </div>
+
+        <div class="install-steps">
+          <div class="install-step fade-in">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Install Anggor</h3>
+              <p>Install globally using your preferred package manager.</p>
+              <div class="step-cmd">
+                <span class="prompt">$</span>
+                bun install -g anggor
+              </div>
+            </div>
+          </div>
+
+          <div class="install-step fade-in delay-1">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Configure your provider</h3>
+              <p>Set your API key and choose your preferred LLM provider.</p>
+              <div class="step-cmd">
+                <span class="prompt">$</span>
+                anggor provider use openai
+              </div>
+            </div>
+          </div>
+
+          <div class="install-step fade-in delay-2">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Start coding</h3>
+              <p>Navigate to your project and let Anggor help you.</p>
+              <div class="step-cmd">
+                <span class="prompt">$</span>
+                cd my-project && anggor
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container">
+      <div class="cta-box">
+        <h2 class="cta-title">Ready to code faster?</h2>
+        <p class="cta-desc">
+          Join developers who are already using Anggor to build better software, faster.
+        </p>
+        <div class="cta-actions">
+          <a href="#install" class="btn btn-primary btn-large">
+            Get Started
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </a>
+          <a href="https://github.com/anggor/anggor" class="btn btn-secondary btn-large" target="_blank">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            Star on GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-copy">
+        © 2024 Anggor. Built with ❤️ for developers.
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/anggor/anggor" class="footer-link" target="_blank">GitHub</a>
+        <a href="#" class="footer-link">Docs</a>
+        <a href="#" class="footer-link">Blog</a>
+        <a href="#" class="footer-link">License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ==================== Terminal Animation ====================
+    const terminalLines = [
+      { type: 'command', prompt: '~ $', text: 'anggor "fix the login bug"' },
+      { type: 'output', text: '' },
+      { type: 'info', text: '╭─────────────────────────────────────────╮' },
+      { type: 'info', text: '│  Anggor v0.1.0                          │' },
+      { type: 'info', text: '│  Provider: openai (gpt-4-turbo)         │' },
+      { type: 'info', text: '│  Model: gpt-4-turbo-preview             │' },
+      { type: 'info', text: '╰─────────────────────────────────────────╯' },
+      { type: 'output', text: '' },
+      { type: 'success', text: '✓ Project scanned: 47 files, 12 modules' },
+      { type: 'output', text: '' },
+      { type: 'command', text: '▶ Planning...' },
+      { type: 'output', text: '  1. Analyze login flow in src/auth.ts' },
+      { type: 'output', text: '  2. Check error handling in LoginForm.tsx' },
+      { type: 'output', text: '  3. Review API endpoint /api/auth/login' },
+      { type: 'output', text: '  4. Fix identified issues' },
+      { type: 'output', text: '  5. Run tests to verify' },
+      { type: 'output', text: '' },
+      { type: 'command', text: '▶ Executing...' },
+      { type: 'output', text: '' },
+      { type: 'path', text: '  Reading src/auth/login.ts...' },
+      { type: 'dim', text: '  + const validateEmail = (email: string) => {' },
+      { type: 'dim', text: '  +   return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);' },
+      { type: 'dim', text: '  + };' },
+      { type: 'output', text: '' },
+      { type: 'success', text: '  ✓ Patch applied to src/auth/login.ts' },
+      { type: 'output', text: '' },
+      { type: 'path', text: '  Reading src/components/LoginForm.tsx...' },
+      { type: 'dim', text: '  + try {' },
+      { type: 'dim', text: '  +   const response = await login(email, password);' },
+      { type: 'dim', text: '  +   if (!response.ok) throw new Error(response.error);' },
+      { type: 'dim', text: '  + } catch (err) {' },
+      { type: 'dim', text: '  +   setError(err.message);' },
+      { type: 'dim', text: '  + }' },
+      { type: 'output', text: '' },
+      { type: 'success', text: '  ✓ Patch applied to src/components/LoginForm.tsx' },
+      { type: 'output', text: '' },
+      { type: 'command', text: '▶ Running tests...' },
+      { type: 'output', text: '  > bun test auth' },
+      { type: 'output', text: '' },
+      { type: 'success', text: '  ✓ 12 tests passed' },
+      { type: 'output', text: '' },
+      { type: 'info', text: '╭─────────────────────────────────────────╮' },
+      { type: 'info', text: '│  Task completed successfully!           │' },
+      { type: 'info', text: '│  Files modified: 2                      │' },
+      { type: 'info', text: '│  Tests passed: 12                       │' },
+      { type: 'info', text: '╰─────────────────────────────────────────╯' },
+    ];
+
+    let currentLineIndex = 0;
+    let isAnimating = false;
+
+    function addTerminalLine(line, delay = 0) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const terminalBody = document.getElementById('terminal-body');
+          const lineElement = document.createElement('div');
+          lineElement.className = 'terminal-line';
+          
+          let content = '';
+          switch (line.type) {
+            case 'command':
+              content = `<span class="prompt">${line.prompt || '▶'}</span> <span class="command">${line.text}</span>`;
+              break;
+            case 'output':
+              content = `<span class="output">${line.text}</span>`;
+              break;
+            case 'info':
+              content = `<span class="info">${line.text}</span>`;
+              break;
+            case 'success':
+              content = `<span class="success">${line.text}</span>`;
+              break;
+            case 'warning':
+              content = `<span class="warning">${line.text}</span>`;
+              break;
+            case 'error':
+              content = `<span class="error">${line.text}</span>`;
+              break;
+            case 'comment':
+              content = `<span class="comment">${line.text}</span>`;
+              break;
+            case 'path':
+              content = `<span class="path">${line.text}</span>`;
+              break;
+            case 'dim':
+              content = `<span class="dim">${line.text}</span>`;
+              break;
+            default:
+              content = line.text;
+          }
+          
+          lineElement.innerHTML = content;
+          terminalBody.appendChild(lineElement);
+          
+          // Auto-scroll to bottom
+          terminalBody.scrollTop = terminalBody.scrollHeight;
+          
+          resolve();
+        }, delay);
+      });
+    }
+
+    async function playTerminalAnimation() {
+      if (isAnimating) return;
+      isAnimating = true;
+      
+      const terminalBody = document.getElementById('terminal-body');
+      terminalBody.innerHTML = '';
+      currentLineIndex = 0;
+      
+      for (let i = 0; i < terminalLines.length; i++) {
+        const line = terminalLines[i];
+        const delay = line.type === 'command' ? 500 : 
+                     line.type === 'output' ? 100 : 
+                     line.type === 'dim' ? 50 : 200;
+        await addTerminalLine(line, delay);
+      }
+      
+      // Add blinking cursor at the end
+      const cursorLine = document.createElement('div');
+      cursorLine.className = 'terminal-line';
+      cursorLine.innerHTML = `<span class="prompt">~ $</span> <span class="cursor"></span>`;
+      terminalBody.appendChild(cursorLine);
+      
+      isAnimating = false;
+    }
+
+    function replayTerminal() {
+      playTerminalAnimation();
+    }
+
+    // ==================== Header Scroll ====================
+    const header = document.getElementById('header');
+    let lastScroll = 0;
+
+    window.addEventListener('scroll', () => {
+      const currentScroll = window.pageYOffset;
+      
+      if (currentScroll > 50) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+      
+      lastScroll = currentScroll;
+    });
+
+    // ==================== Intersection Observer for Animations ====================
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+
+    // Observe all fade-in elements
+    document.querySelectorAll('.fade-in').forEach(el => {
+      observer.observe(el);
+    });
+
+    // ==================== Copy Install Command ====================
+    function copyInstallCmd() {
+      const cmd = 'bun install -g anggor';
+      navigator.clipboard.writeText(cmd).then(() => {
+        const cmdElement = document.querySelector('.install-cmd');
+        const originalHTML = cmdElement.innerHTML;
+        cmdElement.innerHTML = `<span class="prompt">$</span> <span class="cmd">Copied!</span>`;
+        setTimeout(() => {
+          cmdElement.innerHTML = originalHTML;
+        }, 2000);
+      });
+    }
+
+    // ==================== Smooth Scroll ====================
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // ==================== Initialize ====================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Start terminal animation when it comes into view
+      const terminalElement = document.getElementById('terminal-demo');
+      const terminalObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            playTerminalAnimation();
+            terminalObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.3 });
+
+      terminalObserver.observe(terminalElement);
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 export const CLI_VERSION = "0.1.0";
 
 export function getHelpText(): string {
-  return `Anggor v${CLI_VERSION}
+	return `Anggor v${CLI_VERSION}
 
 Usage:
   anggor                      Start interactive chat mode
@@ -15,6 +15,7 @@ Usage:
   anggor resume               Resume previous session
   anggor cost <subcommand>     Show/reset cost tracking
   anggor plugin <subcommand>   Manage plugins
+  anggor extension <subcommand> Manage extensions
   anggor config <subcommand>   View/change config
 
 Global flags:
@@ -36,5 +37,6 @@ Examples:
   anggor provider use openai
   anggor cost show
   anggor plugin list
+  anggor extension list
   anggor config set approvalMode balanced`;
 }

@@ -10,76 +10,71 @@
  */
 
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, streamText, type CoreMessage } from "ai";
+import { type CoreMessage, generateText, streamText } from "ai";
 
-import type {
-  Provider,
-  ProviderConfig,
-  ProviderMessage,
-  ProviderResponse,
-} from "./index.js";
+import type { Provider, ProviderConfig, ProviderMessage, ProviderResponse } from "./index.js";
 
 function toCoreMessages(messages: ProviderMessage[]): CoreMessage[] {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  })) as CoreMessage[];
+	return messages.map((message) => ({
+		role: message.role,
+		content: message.content,
+	})) as CoreMessage[];
 }
 
 function getApiKey(config: ProviderConfig): string {
-  if (!config.apiKey) {
-    throw new Error(`API key is required for custom provider`);
-  }
+	if (!config.apiKey) {
+		throw new Error(`API key is required for custom provider`);
+	}
 
-  return config.apiKey;
+	return config.apiKey;
 }
 
 function getEndpoint(config: ProviderConfig): string {
-  if (!config.endpoint) {
-    throw new Error(`Endpoint is required for custom provider`);
-  }
+	if (!config.endpoint) {
+		throw new Error(`Endpoint is required for custom provider`);
+	}
 
-  return config.endpoint;
+	return config.endpoint;
 }
 
 export class CustomProvider implements Provider {
-  private readonly client;
-  private readonly modelName: string;
+	private readonly client;
+	private readonly modelName: string;
 
-  constructor(config: ProviderConfig) {
-    this.modelName = config.model ?? "gpt-3.5-turbo";
-    this.client = createOpenAI({
-      apiKey: getApiKey(config),
-      baseURL: getEndpoint(config),
-    });
-  }
+	constructor(config: ProviderConfig) {
+		this.modelName = config.model ?? "gpt-3.5-turbo";
+		this.client = createOpenAI({
+			apiKey: getApiKey(config),
+			baseURL: getEndpoint(config),
+		});
+	}
 
-  async chat(messages: ProviderMessage[]): Promise<ProviderResponse> {
-    const result = await generateText({
-      model: this.client(this.modelName),
-      messages: toCoreMessages(messages),
-    });
+	async chat(messages: ProviderMessage[]): Promise<ProviderResponse> {
+		const result = await generateText({
+			model: this.client(this.modelName),
+			messages: toCoreMessages(messages),
+		});
 
-    return {
-      content: result.text,
-      model: result.response.modelId ?? this.modelName,
-      usage: result.usage
-        ? {
-            promptTokens: result.usage.promptTokens,
-            completionTokens: result.usage.completionTokens,
-          }
-        : undefined,
-    };
-  }
+		return {
+			content: result.text,
+			model: result.response.modelId ?? this.modelName,
+			usage: result.usage
+				? {
+						promptTokens: result.usage.promptTokens,
+						completionTokens: result.usage.completionTokens,
+					}
+				: undefined,
+		};
+	}
 
-  async *stream(messages: ProviderMessage[]): AsyncGenerator<string> {
-    const result = streamText({
-      model: this.client(this.modelName),
-      messages: toCoreMessages(messages),
-    });
+	async *stream(messages: ProviderMessage[]): AsyncGenerator<string> {
+		const result = streamText({
+			model: this.client(this.modelName),
+			messages: toCoreMessages(messages),
+		});
 
-    for await (const chunk of result.textStream) {
-      yield chunk;
-    }
-  }
+		for await (const chunk of result.textStream) {
+			yield chunk;
+		}
+	}
 }
