@@ -1,0 +1,20 @@
+FROM oven/bun:latest
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy package files first for better caching
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the binary
+RUN bun run compile
+
+# Set entrypoint
+ENTRYPOINT ["./dist/anggor"]
