@@ -15,14 +15,14 @@ import { cliui } from "@poppinss/cliui";
 let _ui: ReturnType<typeof cliui> | null = null;
 
 function ui() {
-  if (!_ui) {
-    _ui = cliui();
-  }
-  return _ui;
+	if (!_ui) {
+		_ui = cliui();
+	}
+	return _ui;
 }
 
 export function resetCliui(): void {
-  _ui = null;
+	_ui = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,12 +34,12 @@ export function resetCliui(): void {
  * Example: printTable(["Name", "Model"], [["openai", "gpt-4o"], ["anthropic", "claude-3"]])
  */
 export function printTable(head: string[], rows: string[][]): void {
-  const tbl = ui().table();
-  tbl.head(head);
-  for (const row of rows) {
-    tbl.row(row);
-  }
-  tbl.render();
+	const tbl = ui().table();
+	tbl.head(head);
+	for (const row of rows) {
+		tbl.row(row);
+	}
+	tbl.render();
 }
 
 // ---------------------------------------------------------------------------
@@ -50,12 +50,12 @@ export function printTable(head: string[], rows: string[][]): void {
  * Print a numbered list of steps (for `anggor plan`).
  */
 export function printSteps(title: string, steps: string[]): void {
-  const instructions = ui().instructions();
-  instructions.heading(title);
-  for (let i = 0; i < steps.length; i++) {
-    instructions.add(`${i + 1}. ${steps[i]}`);
-  }
-  instructions.render();
+	const instructions = ui().instructions();
+	instructions.heading(title);
+	for (let i = 0; i < steps.length; i++) {
+		instructions.add(`${i + 1}. ${steps[i]}`);
+	}
+	instructions.render();
 }
 
 // ---------------------------------------------------------------------------
@@ -66,12 +66,12 @@ export function printSteps(title: string, steps: string[]): void {
  * Print a titled section with bullet-point lines.
  */
 export function printSection(title: string, lines: string[]): void {
-  const instructions = ui().instructions();
-  instructions.heading(title);
-  for (const line of lines) {
-    instructions.add(line);
-  }
-  instructions.render();
+	const instructions = ui().instructions();
+	instructions.heading(title);
+	for (const line of lines) {
+		instructions.add(line);
+	}
+	instructions.render();
 }
 
 // ---------------------------------------------------------------------------
@@ -79,13 +79,13 @@ export function printSection(title: string, lines: string[]): void {
 // ---------------------------------------------------------------------------
 
 export interface TaskDef {
-  title: string;
-  action: (update: (msg: string) => void) => Promise<string | ErrorResult>;
+	title: string;
+	action: (update: (msg: string) => void) => Promise<string | ErrorResult>;
 }
 
 export interface ErrorResult {
-  isError: true;
-  message: string;
+	isError: true;
+	message: string;
 }
 
 /**
@@ -94,20 +94,20 @@ export interface ErrorResult {
  * Returns true if all tasks succeeded.
  */
 export async function runTasks(tasks: TaskDef[]): Promise<boolean> {
-  const tm = ui().tasks();
+	const tm = ui().tasks();
 
-  for (const t of tasks) {
-    tm.add(t.title, async ({ update }) => {
-      const result = await t.action(update);
-      return result;
-    });
-  }
+	for (const t of tasks) {
+		tm.add(t.title, async ({ update }) => {
+			const result = await t.action(update);
+			return result;
+		});
+	}
 
-  try {
-    await tm.run();
-  } catch {
-    // task manager handles errors internally
-  }
+	try {
+		await tm.run();
+	} catch {
+		// task manager handles errors internally
+	}
 
-  return tm.getState() === "succeeded";
+	return tm.getState() === "succeeded";
 }

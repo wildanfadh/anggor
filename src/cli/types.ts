@@ -1,124 +1,124 @@
 export type GlobalFlag = "help" | "version" | "dryRun" | "cost";
 
 export type TopLevelCommandName =
-  | "chat"
-  | "oneshot"
-  | "plan"
-  | "status"
-  | "review"
-  | "explain"
-  | "commit"
-  | "resume"
-  | "mcp"
-  | "skill"
-  | "provider"
-  | "cost"
-  | "plugin"
-  | "config";
+	| "chat"
+	| "oneshot"
+	| "plan"
+	| "status"
+	| "review"
+	| "explain"
+	| "commit"
+	| "resume"
+	| "mcp"
+	| "skill"
+	| "provider"
+	| "cost"
+	| "plugin"
+	| "config";
 
 export interface ParsedBaseCommand {
-  name: TopLevelCommandName;
-  rawArgs: string[];
-  flags: GlobalFlag[];
+	name: TopLevelCommandName;
+	rawArgs: string[];
+	flags: GlobalFlag[];
 }
 
 export interface ChatCommand extends ParsedBaseCommand {
-  name: "chat";
+	name: "chat";
 }
 
 export interface OneShotCommand extends ParsedBaseCommand {
-  name: "oneshot";
-  prompt: string;
+	name: "oneshot";
+	prompt: string;
 }
 
 export interface PlanCommand extends ParsedBaseCommand {
-  name: "plan";
-  prompt: string;
+	name: "plan";
+	prompt: string;
 }
 
 export interface ReviewCommand extends ParsedBaseCommand {
-  name: "review";
+	name: "review";
 }
 
 export interface ExplainCommand extends ParsedBaseCommand {
-  name: "explain";
-  target: string;
+	name: "explain";
+	target: string;
 }
 
 export interface CommitCommand extends ParsedBaseCommand {
-  name: "commit";
+	name: "commit";
 }
 
 export interface ResumeCommand extends ParsedBaseCommand {
-  name: "resume";
+	name: "resume";
 }
 
 export type GroupSubcommand = string | undefined;
 
 export interface McpCommand extends ParsedBaseCommand {
-  name: "mcp";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "mcp";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface SkillCommand extends ParsedBaseCommand {
-  name: "skill";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "skill";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface ProviderCommand extends ParsedBaseCommand {
-  name: "provider";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "provider";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface CostCommand extends ParsedBaseCommand {
-  name: "cost";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "cost";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface PluginCommand extends ParsedBaseCommand {
-  name: "plugin";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "plugin";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface ConfigCommand extends ParsedBaseCommand {
-  name: "config";
-  subcommand?: GroupSubcommand;
-  args: string[];
+	name: "config";
+	subcommand?: GroupSubcommand;
+	args: string[];
 }
 
 export interface StatusCommand extends ParsedBaseCommand {
-  name: "status";
+	name: "status";
 }
 
 export type ParsedCommand =
-  | ChatCommand
-  | OneShotCommand
-  | PlanCommand
-  | StatusCommand
-  | ReviewCommand
-  | ExplainCommand
-  | CommitCommand
-  | ResumeCommand
-  | McpCommand
-  | SkillCommand
-  | ProviderCommand
-  | CostCommand
-  | PluginCommand
-  | ConfigCommand;
+	| ChatCommand
+	| OneShotCommand
+	| PlanCommand
+	| StatusCommand
+	| ReviewCommand
+	| ExplainCommand
+	| CommitCommand
+	| ResumeCommand
+	| McpCommand
+	| SkillCommand
+	| ProviderCommand
+	| CostCommand
+	| PluginCommand
+	| ConfigCommand;
 
 export interface ParseResultSuccess {
-  ok: true;
-  command: ParsedCommand;
+	ok: true;
+	command: ParsedCommand;
 }
 
 export interface ParseResultError {
-  ok: false;
-  error: string;
+	ok: false;
+	error: string;
 }
 
 export type ParseResult = ParseResultSuccess | ParseResultError;

@@ -1,7 +1,7 @@
 export const CLI_VERSION = "0.1.0";
 
 export function getHelpText(): string {
-  return `Anggor v${CLI_VERSION}
+	return `Anggor v${CLI_VERSION}
 
 Usage:
   anggor                      Start interactive chat mode
