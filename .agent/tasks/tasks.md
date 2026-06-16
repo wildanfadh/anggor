@@ -60,8 +60,27 @@
 | 38 | Add telemetry (opt-in) | P3 | fullstack-engineer | [x] |
 | 39 | Add plugin system | P3 | fullstack-engineer | [x] |
 
+## CLI UI Modernization Tasks
+
+Design reference: [`cli-ui-implementation-design.md`](./cli-ui-implementation-design.md)
+
+| # | Task | Priority | Agent | Status |
+|---|------|----------|-------|--------|
+| 40 | Add `@poppinss/cliui` and create structured UI wrapper (`src/ui/cliui.ts`) | P0 | fullstack-engineer | [x] |
+| 41 | Add Clack prompt wrapper (`src/ui/prompts.ts`) for confirm/select/text flows | P0 | fullstack-engineer | [x] |
+| 42 | Keep Bun-first runtime/docs/examples and avoid Node-first generated suggestions | P0 | fullstack-engineer | [x] |
+| 43 | Migrate read-only command output (`plan`, `status`, `review`, `provider list`, `mcp list`, `skill list`) to structured CLI UI | P1 | fullstack-engineer | [x] |
+| 44 | Replace `readline` commit/chat interactions with `@clack/prompts` | P1 | fullstack-engineer | [x] |
+| 45 | Add approval UX for `safe`, `balanced`, and `auto` modes | P1 | fullstack-engineer | [x] |
+| 46 | Normalize actionable provider/API-key and command failure errors | P1 | fullstack-engineer | [x] |
+| 47 | Preserve custom token streaming while adding structured headers/summaries | P1 | fullstack-engineer | [x] |
+| 48 | Add CLI output tests and benchmark help/version startup after UI changes | P1 | test-engineer | [x] |
+| 49 | Verify binary build, startup target, and Bun-first UX end-to-end | P1 | qa-qc-engineer | [x] |
+
 ## Guidelines
 - Prioritize V1.0 until core workflow is usable end-to-end.
 - Lock tasks before starting (`tasks/locks/<task-number>.lock`).
 - Defer V1.1/V2.0 work unless it directly supports V1.0 implementation.
 - Keep commit messages, PR titles, and code comments in English.
+- Runtime, scripts, examples, and agent-suggested validation commands should be Bun-first unless a target project clearly requires another runtime.
+- Do not publish `BLUEPRINT.md`; it is ignored by git and treated as internal planning material.

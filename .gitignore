@@ -27,6 +27,9 @@ Thumbs.db
 # Config (sensitive)
 anggor.config.local.json
 
+# Internal blueprint / planning docs
+BLUEPRINT.md
+
 # Cache
 .cache/
 *.tsbuildinfo

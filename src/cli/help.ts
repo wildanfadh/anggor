@@ -13,23 +13,28 @@ Usage:
   anggor explain <file>       Explain a file
   anggor commit               Generate a commit message
   anggor resume               Resume previous session
-  anggor mcp <subcommand>     Manage MCP servers
-  anggor skill <subcommand>   Manage skills
-  anggor provider <subcommand> Manage providers
+  anggor cost <subcommand>     Show/reset cost tracking
+  anggor plugin <subcommand>   Manage plugins
+  anggor config <subcommand>   View/change config
 
 Global flags:
   -h, --help                  Show help
   -v, --version               Show version
   --dry-run                   Show plan without executing
+  --cost                      Estimate cost before executing
 
 Examples:
   anggor
   anggor "fix all lint errors"
   anggor plan "add authentication"
   anggor --dry-run "refactor helpers"
+  anggor --cost "implement login"
   anggor status
   anggor explain src/agent/core.ts
   anggor mcp list
   anggor skill install laravel-reviewer
-  anggor provider use openai`;
+  anggor provider use openai
+  anggor cost show
+  anggor plugin list
+  anggor config set approvalMode balanced`;
 }

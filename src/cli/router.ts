@@ -4,7 +4,9 @@ import { Agent } from "../agent/core.js";
 import { SessionMemory } from "../agent/memory.js";
 import { loadMemory as loadPersistent, applyLoadedState } from "../memory/bank.js";
 import { printPlanHeader, printCompletion } from "../ui/stream.js";
-import { printInfo, printMuted, printWarning, printSuccess } from "../ui/output.js";
+import { printInfo, printMuted, printWarning, printSuccess, printProviderTable } from "../ui/output.js";
+import { printSteps } from "../ui/cliui.js";
+import { confirm, text, isCancel } from "../ui/prompts.js";
 import { createInterruptHandler, registerSimpleInterrupt } from "../utils/interrupt.js";
 import { gitCommit, gitStatus } from "../tools/git.js";
 
@@ -18,6 +20,40 @@ function hasDryRunFlag(command: ParsedCommand): boolean {
 
 function getProviderLabel(context: RuntimeContext): string {
   return `${context.config.provider.name}/${context.config.provider.model}`;
+}
+
+/**
+ * Print an actionable provider / API key error message.
+ */
+async function printProviderKeyError(providerName: string, model: string): Promise<void> {
+  const envVarMap: Record<string, string> = {
+    openai: "OPENAI_API_KEY",
+    anthropic: "ANTHROPIC_API_KEY",
+    google: "GOOGLE_API_KEY",
+    ollama: "OLLAMA_HOST",
+    openrouter: "OPENROUTER_API_KEY",
+    groq: "GROQ_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    azure: "AZURE_API_KEY",
+  };
+
+  const envVar = envVarMap[providerName] ?? `${providerName.toUpperCase()}_API_KEY`;
+
+  const { printSection } = await import("../ui/cliui.js");
+  printSection("Missing provider key", [
+    `Provider : ${providerName}`,
+    `Model    : ${model}`,
+    `Env var  : ${envVar}`,
+    "",
+    "Fix:",
+    `  export ${envVar}="sk-..."`,
+    "",
+    "Or edit .anggor.json:",
+    `  { "provider": { "apiKey": "env:${envVar}" } }`,
+  ]);
+
+  // Also show provider list hint
+  printMuted("Run `anggor provider list` to see available providers.");
 }
 
 // ---------------------------------------------------------------------------
@@ -121,8 +157,20 @@ export async function routeCommand(
         if (dryRun) {
           printInfo("Dry-run mode: showing plan without executing");
           const result = await agent.planOnly(command.prompt);
-          printPlanHeader(command.prompt, 4);
-          console.log(result.message);
+
+          // Extract steps from the plan result
+          const steps = result.message
+            .split("\n")
+            .filter((line) => /^\s*\d+\./.test(line))
+            .map((line) => line.replace(/^\s*\d+\.\s*/, ""));
+
+          if (steps.length > 0) {
+            const { printSteps: ps } = await import("../ui/cliui.js");
+            ps(`DRY RUN  ${command.prompt}`, steps);
+          } else {
+            printPlanHeader(command.prompt, 4);
+            console.log(result.message);
+          }
         } else {
           printInfo(
             `Running with ${getProviderLabel(context)}: ${command.prompt}`
@@ -152,8 +200,22 @@ export async function routeCommand(
         dryRun: true,
       });
       const result = await agent.planOnly(command.prompt);
-      printPlanHeader(command.prompt, 4);
-      console.log(result.message);
+
+      // Extract steps from the plan result
+      const steps = result.message
+        .split("\n")
+        .filter((line) => /^\s*\d+\./.test(line))
+        .map((line) => line.replace(/^\s*\d+\.\s*/, ""));
+
+      if (steps.length > 0) {
+        printSteps(
+          `PLAN  ${command.prompt}`,
+          steps
+        );
+      } else {
+        printPlanHeader(command.prompt, 4);
+        console.log(result.message);
+      }
       return;
     }
 
@@ -170,12 +232,13 @@ export async function routeCommand(
           return;
         }
 
-        printInfo(`Found ${status.files.length} changed files:`);
-        for (const f of status.files) {
-          const icon =
-            f.worktree === "?" ? "+" : f.worktree === "M" ? "~" : " ";
-          printMuted(`  ${icon} ${f.path}`);
-        }
+        const { printTable } = await import("../ui/cliui.js");
+        const headers = ["Status", "File"];
+        const rows = status.files.map((f) => [
+          f.worktree === "?" ? "A" : f.worktree === "M" ? "M" : f.worktree,
+          f.path,
+        ]);
+        printTable(headers, rows);
       } catch (error: unknown) {
         printWarning(
           `Could not get git status: ${error instanceof Error ? error.message : String(error)}`
@@ -214,12 +277,26 @@ export async function routeCommand(
 
           console.log(`\n${response.content}\n`);
         } catch (error: unknown) {
-          printWarning(
-            `Could not explain file: ${error instanceof Error ? error.message : String(error)}`
-          );
+          const errMsg =
+            error instanceof Error ? error.message : String(error);
+
+          if (
+            errMsg.includes("API key") ||
+            errMsg.includes("Incorrect API key") ||
+            errMsg.includes("401") ||
+            errMsg.includes("Unauthorized")
+          ) {
+            await printProviderKeyError(
+              context.config.provider.name,
+              context.config.provider.model ?? "unknown"
+            );
+          } else {
+            printWarning(`Could not explain file: ${errMsg}`);
+          }
         }
       } else {
         printMuted("Provider not configured. Cannot explain files.");
+        printMuted("Run `anggor provider use <name>` to set a provider.");
       }
       return;
     }
@@ -232,19 +309,24 @@ export async function routeCommand(
       printInfo("Generating commit message...");
 
       try {
-        // Get git status and diff
         const status = await gitStatus();
         if (status.files.length === 0) {
           printMuted("No changes to commit. Working tree is clean.");
           return;
         }
 
-        // Get diff for context
         const { gitDiff } = await import("../tools/git.js");
         const diff = await gitDiff();
 
+        // Show changed files as a table
+        const { printTable } = await import("../ui/cliui.js");
+        const fileRows = status.files.map((f) => [
+          `${f.index}${f.worktree}`,
+          f.path,
+        ]);
+        printTable(["Status", "File"], fileRows);
+
         if (context.provider) {
-          // LLM-powered commit message
           const response = await context.provider.chat([
             {
               role: "system",
@@ -260,43 +342,40 @@ export async function routeCommand(
           const message = response.content.trim();
           printInfo(`Suggested commit message:\n  ${message}`);
 
-          // Auto-commit with confirmation
-          const readline = await import("node:readline");
-          const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
-          });
+          // Use @clack/prompts for confirmation
+          const shouldCommit = await confirm(`Commit with this message?`);
 
-          const answer = await new Promise<string>((resolve) => {
-            rl.question("\nCommit with this message? [Y/n] ", resolve);
-          });
-          rl.close();
-
-          if (answer.toLowerCase() !== "n" && answer.toLowerCase() !== "no") {
-            const result = await gitCommit(message);
-            printSuccess(`Committed: ${result.shortHash}`);
-          } else {
+          if (isCancel(shouldCommit) || !shouldCommit) {
             printMuted("Commit cancelled.");
+            return;
           }
+
+          const result = await gitCommit(message);
+          printSuccess(`Committed: ${result.shortHash}`);
         } else {
-          // Heuristic commit: use first changed file as hint
           const firstFile = status.files[0]?.path ?? "update";
           const defaultMsg = `chore: update ${firstFile}`;
-          printInfo(`Suggested commit message (no LLM):\n  ${defaultMsg}`);
+          printInfo(`No LLM provider configured.`);
 
-          const readline = await import("node:readline");
-          const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
+          const customMsg = await text({
+            message: "Enter commit message",
+            placeholder: defaultMsg,
+            defaultValue: defaultMsg,
           });
 
-          const answer = await new Promise<string>((resolve) => {
-            rl.question("\nEnter commit message (or press Enter for default): ", resolve);
-          });
-          rl.close();
+          if (isCancel(customMsg)) {
+            printMuted("Commit cancelled.");
+            return;
+          }
 
-          const message = answer.trim() || defaultMsg;
-          const result = await gitCommit(message);
+          const finalMessage =
+            typeof customMsg === "string" ? customMsg.trim() : "";
+          if (!finalMessage) {
+            printMuted("No message provided. Commit cancelled.");
+            return;
+          }
+
+          const result = await gitCommit(finalMessage);
           printSuccess(`Committed: ${result.shortHash}`);
         }
       } catch (error: unknown) {
@@ -374,14 +453,18 @@ export async function routeCommand(
 
         if (names.length === 0) {
           printMuted("No MCP servers configured.");
+          printMuted(
+            "Add servers to your .anggor.json under \"mcpServers\"."
+          );
           return;
         }
 
-        printInfo(`MCP servers (${names.length}):`);
-        for (const name of names) {
+        const { printTable } = await import("../ui/cliui.js");
+        const rows = names.map((name) => {
           const raw = mcpServers[name] as Record<string, unknown> | undefined;
-          printMuted(`  ${name} → ${raw?.command ?? "unknown"}`);
-        }
+          return [name, String(raw?.command ?? "unknown")];
+        });
+        printTable(["Name", "Command"], rows);
         return;
       }
 
@@ -408,8 +491,36 @@ export async function routeCommand(
     // =====================================================================
     case "skill":
       registerSimpleInterrupt();
-      printInfo(`Skill command: ${command.subcommand ?? "list"}`);
-      printMuted("Skills available in V2.0. Built-in: reviewer, refactor, tester, architect, security.");
+      {
+        const subcommand = command.subcommand ?? "list";
+
+        if (subcommand === "list") {
+          const { SkillRegistry } = await import("../skills/loader.js");
+          const registry = new SkillRegistry();
+          await registry.loadBuiltins();
+
+          const skills = registry.list();
+          if (skills.length === 0) {
+            printMuted("No skills installed.");
+          } else {
+            const { printTable } = await import("../ui/cliui.js");
+            const rows = skills.map((s) => [s.name, "builtin", s.description]);
+            printTable(["Name", "Source", "Description"], rows);
+          }
+        } else if (subcommand === "install") {
+          printMuted(
+            "Skill install: coming soon via skill marketplace (V2.0)."
+          );
+        } else if (subcommand === "remove") {
+          printMuted("Skill remove: coming soon (V2.0).");
+        } else if (subcommand === "run") {
+          printMuted("Skill run: coming soon (V2.0).");
+        } else if (subcommand === "search") {
+          printMuted("Skill search: coming soon (V2.0).");
+        } else {
+          printMuted(`Unknown skill subcommand: ${subcommand}`);
+        }
+      }
       return;
 
     // =====================================================================
@@ -433,11 +544,7 @@ export async function routeCommand(
         ];
 
         const active = context.config.provider.name;
-        printInfo(`Available providers (active: ${active}):`);
-        for (const p of providers) {
-          const marker = p.name === active ? " *" : "  ";
-          printMuted(`${marker} ${p.name} → ${p.models}`);
-        }
+        printProviderTable(active, providers);
         return;
       }
 
@@ -480,6 +587,130 @@ export async function routeCommand(
       }
 
       printMuted(`Unknown provider subcommand: ${subcommand}`);
+      return;
+    }
+
+    // =====================================================================
+    // Cost tracking (V2.0)
+    // =====================================================================
+    case "cost": {
+      registerSimpleInterrupt();
+      const subcommand = command.subcommand ?? "show";
+
+      if (subcommand === "show") {
+        const { CostTracker } = await import("../cost/tracker.js");
+        // In a real app, this would load from persistent storage
+        const tracker = new CostTracker();
+        const summary = tracker.getSummary();
+
+        const { printTable } = await import("../ui/cliui.js");
+        const rows: string[][] = [
+          ["Total tokens", String(summary.totalTokens)],
+          ["Total cost", `$${summary.totalCost.toFixed(4)}`],
+        ];
+
+        for (const [provider, data] of Object.entries(summary.byProvider)) {
+          rows.push([`  ${provider} tokens`, String(data.tokens)]);
+          rows.push([`  ${provider} cost`, `$${data.cost.toFixed(4)}`]);
+        }
+
+        printTable(["Metric", "Value"], rows);
+      } else if (subcommand === "reset") {
+        const { CostTracker } = await import("../cost/tracker.js");
+        const tracker = new CostTracker();
+        tracker.reset();
+        printSuccess("Cost tracking reset.");
+      } else {
+        printMuted(`Unknown cost subcommand: ${subcommand}`);
+      }
+      return;
+    }
+
+    // =====================================================================
+    // Plugin management (V2.0)
+    // =====================================================================
+    case "plugin": {
+      registerSimpleInterrupt();
+      const subcommand = command.subcommand ?? "list";
+
+      if (subcommand === "list") {
+        const { PluginLoader } = await import("../plugins/loader.js");
+        const loader = new PluginLoader();
+        await loader.loadAll();
+
+        const plugins = loader.list();
+        if (plugins.length === 0) {
+          printMuted("No plugins installed.");
+          printMuted(
+            "Place plugin .js/.ts files in ~/.anggor/plugins/. " +
+            "Run `anggor plugin install <path>` to install."
+          );
+        } else {
+          const { printTable } = await import("../ui/cliui.js");
+          const rows = plugins.map((p) => [p.name, p.version, p.description ?? ""]);
+          printTable(["Name", "Version", "Description"], rows);
+        }
+      } else if (subcommand === "install") {
+        const pluginPath = command.args?.[0];
+        if (!pluginPath) {
+          printMuted("Usage: anggor plugin install <path-to-plugin.js>");
+          return;
+        }
+
+        try {
+          const { PluginLoader } = await import("../plugins/loader.js");
+          const loader = new PluginLoader();
+          const plugin = await loader.loadPlugin(pluginPath);
+          if (plugin) {
+            printSuccess(`Plugin installed: ${plugin.meta.name}`);
+          } else {
+            printWarning("Could not load plugin from path.");
+          }
+        } catch (error: unknown) {
+          printWarning(
+            `Plugin install failed: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      } else {
+        printMuted(`Unknown plugin subcommand: ${subcommand}`);
+      }
+      return;
+    }
+
+    // =====================================================================
+    // Config management
+    // =====================================================================
+    case "config": {
+      registerSimpleInterrupt();
+      const subcommand = command.subcommand ?? "show";
+
+      if (subcommand === "set") {
+        const key = command.args?.[0];
+        const value = command.args?.[1];
+
+        if (!key || !value) {
+          printMuted('Usage: anggor config set <key> <value>');
+          printMuted('Example: anggor config set approvalMode balanced');
+          return;
+        }
+
+        printInfo(`To set config, edit your .anggor.json:`);
+        printMuted(`  "${key}": "${value}"`);
+        printMuted("Config file is located at .anggor.json in your project root.");
+      } else if (subcommand === "show") {
+        const { printTable } = await import("../ui/cliui.js");
+        const rows: string[][] = [
+          ["Provider", context.config.provider.name],
+          ["Model", context.config.provider.model ?? "default"],
+          ["Max iterations", String(context.config.agent.maxIterations)],
+          ["Approval mode", context.config.agent.approvalMode],
+          ["Max context tokens", String(context.config.context.maxTokens)],
+          ["Scan depth", String(context.config.context.scanDepth)],
+        ];
+        printTable(["Setting", "Value"], rows);
+      } else {
+        printMuted(`Unknown config subcommand: ${subcommand}. Use "show" or "set".`);
+      }
       return;
     }
   }

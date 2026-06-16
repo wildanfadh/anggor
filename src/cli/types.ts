@@ -1,4 +1,4 @@
-export type GlobalFlag = "help" | "version" | "dryRun";
+export type GlobalFlag = "help" | "version" | "dryRun" | "cost";
 
 export type TopLevelCommandName =
   | "chat"
@@ -11,7 +11,10 @@ export type TopLevelCommandName =
   | "resume"
   | "mcp"
   | "skill"
-  | "provider";
+  | "provider"
+  | "cost"
+  | "plugin"
+  | "config";
 
 export interface ParsedBaseCommand {
   name: TopLevelCommandName;
@@ -70,6 +73,24 @@ export interface ProviderCommand extends ParsedBaseCommand {
   args: string[];
 }
 
+export interface CostCommand extends ParsedBaseCommand {
+  name: "cost";
+  subcommand?: GroupSubcommand;
+  args: string[];
+}
+
+export interface PluginCommand extends ParsedBaseCommand {
+  name: "plugin";
+  subcommand?: GroupSubcommand;
+  args: string[];
+}
+
+export interface ConfigCommand extends ParsedBaseCommand {
+  name: "config";
+  subcommand?: GroupSubcommand;
+  args: string[];
+}
+
 export interface StatusCommand extends ParsedBaseCommand {
   name: "status";
 }
@@ -85,7 +106,10 @@ export type ParsedCommand =
   | ResumeCommand
   | McpCommand
   | SkillCommand
-  | ProviderCommand;
+  | ProviderCommand
+  | CostCommand
+  | PluginCommand
+  | ConfigCommand;
 
 export interface ParseResultSuccess {
   ok: true;

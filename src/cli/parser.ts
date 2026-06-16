@@ -1,10 +1,13 @@
 import type {
   CommitCommand,
+  ConfigCommand,
+  CostCommand,
   ExplainCommand,
   GlobalFlag,
   McpCommand,
   ParseResult,
   PlanCommand,
+  PluginCommand,
   ProviderCommand,
   ResumeCommand,
   ReviewCommand,
@@ -18,6 +21,7 @@ const GLOBAL_FLAG_MAP: Record<string, GlobalFlag> = {
   "--version": "version",
   "-v": "version",
   "--dry-run": "dryRun",
+  "--cost": "cost",
 };
 
 function isGlobalFlag(arg: string): arg is keyof typeof GLOBAL_FLAG_MAP {
@@ -55,11 +59,11 @@ function createSimpleCommand<T extends CommitCommand | ResumeCommand | ReviewCom
 }
 
 function createGroupCommand(
-  name: "mcp" | "skill" | "provider",
+  name: "mcp" | "skill" | "provider" | "cost" | "plugin" | "config",
   rawArgs: string[],
   flags: GlobalFlag[],
   args: string[]
-): McpCommand | SkillCommand | ProviderCommand {
+): McpCommand | SkillCommand | ProviderCommand | CostCommand | PluginCommand | ConfigCommand {
   const [subcommand, ...restArgs] = args;
   return {
     name,
@@ -153,6 +157,24 @@ export function parseArgv(argv: string[]): ParseResult {
       return {
         ok: true,
         command: createGroupCommand("provider", rawArgs, flags, tail),
+      };
+
+    case "cost":
+      return {
+        ok: true,
+        command: createGroupCommand("cost", rawArgs, flags, tail),
+      };
+
+    case "plugin":
+      return {
+        ok: true,
+        command: createGroupCommand("plugin", rawArgs, flags, tail),
+      };
+
+    case "config":
+      return {
+        ok: true,
+        command: createGroupCommand("config", rawArgs, flags, tail),
       };
 
     default:

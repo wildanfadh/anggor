@@ -154,7 +154,7 @@ const safetyConfig = {
   allowedCommands: ["npm", "git", "node"],
 };
 
-const result = await execCommand("npm test", safetyConfig);
+const result = await execCommand("bun test", safetyConfig);
 
 console.log(result.exitCode);  // 0
 console.log(result.stdout);    // Test output
@@ -216,7 +216,7 @@ const result = await streamToolExecution(
   "terminal.exec",
   "Running tests",
   async () => {
-    return await execCommand("npm test", safetyConfig);
+    return await execCommand("bun test", safetyConfig);
   }
 );
 ```
